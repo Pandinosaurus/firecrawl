@@ -446,7 +446,11 @@ export class WebCrawler {
         const results = await pipeline.exec();
 
         const uniqueURLs = filteredLinks.filter(
-          (_, index) => results && results[index] && results[index][1] === 1,
+          (_, index) =>
+            results &&
+            results[index] &&
+            !results[index][0] &&
+            results[index][1] === 1,
         );
 
         await redisEvictConnection.expire(

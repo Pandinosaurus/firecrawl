@@ -252,6 +252,10 @@ async function _autoChargeScale(
             );
           }
 
+          // Reset ACUC cache to reflect the new credit balance
+          await clearACUC(chunk.api_key);
+          await clearACUCTeam(chunk.team_id);
+
           try {
             // Check for frequent auto-recharges in the past week
             const weeklyAutoRechargeKey = `auto-recharge-weekly:${chunk.team_id}`;
@@ -287,10 +291,6 @@ async function _autoChargeScale(
             chunk,
             true,
           );
-
-          // Reset ACUC cache to reflect the new credit balance
-          await clearACUC(chunk.api_key);
-          await clearACUCTeam(chunk.team_id);
 
           return {
             success: true,

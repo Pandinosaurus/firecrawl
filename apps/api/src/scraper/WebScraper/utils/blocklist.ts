@@ -28,7 +28,7 @@ export async function initializeBlocklist() {
   if (error || !data) {
     throw new Error("Error getting blocklist");
   }
-  blob = data;
+  blob = data.data;
 }
 
 export function isUrlBlocked(url: string, flags: TeamFlags): boolean {

@@ -308,7 +308,7 @@ describe("Scrape tests", () => {
       scrapeTimeout,
     );
 
-    describe("Ad blocking (f-e dependant)", () => {
+    describe("Ad blocking (f-e dependent)", () => {
       it.concurrent(
         "blocking ads works",
         async () => {
@@ -1058,7 +1058,7 @@ describe("Scrape tests", () => {
       );
     });
 
-    describe("Location API (f-e dependant)", () => {
+    describe("Location API (f-e dependent)", () => {
       it.concurrent(
         "works without specifying an explicit location",
         async () => {
@@ -1089,7 +1089,7 @@ describe("Scrape tests", () => {
       );
     });
 
-    describe("Screenshot (f-e dependant)", () => {
+    describe("Screenshot (f-e dependent)", () => {
       it.concurrent(
         "screenshot format works",
         async () => {
@@ -1123,7 +1123,7 @@ describe("Scrape tests", () => {
       );
     });
 
-    describe("PDF generation (f-e dependant)", () => {
+    describe("PDF generation (f-e dependent)", () => {
       it.concurrent(
         "works",
         async () => {
@@ -1144,7 +1144,7 @@ describe("Scrape tests", () => {
       );
     });
 
-    describe("Proxy API (f-e dependant)", () => {
+    describe("Proxy API (f-e dependent)", () => {
       it.concurrent(
         "undefined works",
         async () => {
@@ -1213,7 +1213,7 @@ describe("Scrape tests", () => {
       // }, scrapeTimeout * 2);
     });
 
-    describe("PDF (f-e dependant)", () => {
+    describe("PDF (f-e dependent)", () => {
       it.concurrent(
         "works",
         async () => {
@@ -1298,7 +1298,7 @@ describe("Scrape tests", () => {
       );
     });
 
-    describe("YouTube (f-e dependant)", () => {
+    describe("YouTube (f-e dependent)", () => {
       if (!process.env.TEST_SUITE_SELF_HOSTED) {
         it.concurrent(
           "scrapes YouTube videos and transcripts",

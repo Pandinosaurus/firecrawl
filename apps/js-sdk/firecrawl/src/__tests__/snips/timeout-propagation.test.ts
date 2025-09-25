@@ -10,11 +10,11 @@ describe('Timeout Propagation Tests', () => {
     
     try {
       await app.scrapeUrl("https://httpbin.org/delay/3", { timeout: 1000 });
-      expect(false).toBe(true); // Should not reach here
+      expect(false).toBe(true);
     } catch (error) {
       const elapsed = Date.now() - startTime;
-      expect(elapsed).toBeLessThan(10000); // Should timeout before 10 seconds
-      expect(elapsed).toBeGreaterThan(50); // Should take at least 50ms
+      expect(elapsed).toBeLessThan(10000);
+      expect(elapsed).toBeGreaterThan(50);
     }
   }, 15000);
 
@@ -24,11 +24,11 @@ describe('Timeout Propagation Tests', () => {
     
     try {
       await app.scrapeUrl("https://httpbin.org/delay/2", { timeout: 0 });
-      expect(false).toBe(true); // Should not reach here
+      expect(false).toBe(true);
     } catch (error) {
       const elapsed = Date.now() - startTime;
-      expect(elapsed).toBeLessThan(8000); // Should timeout quickly
-      expect(elapsed).toBeGreaterThan(50); // Should take at least 50ms
+      expect(elapsed).toBeLessThan(8000);
+      expect(elapsed).toBeGreaterThan(50);
     }
   }, 10000);
 
@@ -41,11 +41,11 @@ describe('Timeout Propagation Tests', () => {
         timeout: 1000,
         waitFor: 2000
       });
-      expect(false).toBe(true); // Should not reach here
+      expect(false).toBe(true);
     } catch (error) {
       const elapsed = Date.now() - startTime;
-      expect(elapsed).toBeLessThan(12000); // Should include waitFor + timeout + buffer
-      expect(elapsed).toBeGreaterThan(50); // Should take at least 50ms
+      expect(elapsed).toBeLessThan(12000);
+      expect(elapsed).toBeGreaterThan(50);
     }
   }, 15000);
 
@@ -61,11 +61,11 @@ describe('Timeout Propagation Tests', () => {
           { type: "wait", selector: ".some-element" }
         ]
       });
-      expect(false).toBe(true); // Should not reach here
+      expect(false).toBe(true);
     } catch (error) {
       const elapsed = Date.now() - startTime;
-      expect(elapsed).toBeLessThan(12000); // Should include action wait times + timeout + buffer
-      expect(elapsed).toBeGreaterThan(50); // Should take at least 50ms
+      expect(elapsed).toBeLessThan(12000);
+      expect(elapsed).toBeGreaterThan(50);
     }
   }, 15000);
 
@@ -75,11 +75,11 @@ describe('Timeout Propagation Tests', () => {
     
     try {
       await app.scrape("https://httpbin.org/delay/3", { timeout: 1000 });
-      expect(false).toBe(true); // Should not reach here
+      expect(false).toBe(true);
     } catch (error) {
       const elapsed = Date.now() - startTime;
-      expect(elapsed).toBeLessThan(10000); // Should timeout before 10 seconds
-      expect(elapsed).toBeGreaterThan(50); // Should take at least 50ms
+      expect(elapsed).toBeLessThan(10000);
+      expect(elapsed).toBeGreaterThan(50);
     }
   }, 15000);
 
@@ -93,11 +93,11 @@ describe('Timeout Propagation Tests', () => {
         prompt: "Extract title",
         scrapeOptions: { timeout: 1000 }
       });
-      expect(false).toBe(true); // Should not reach here
+      expect(false).toBe(true);
     } catch (error) {
       const elapsed = Date.now() - startTime;
-      expect(elapsed).toBeLessThan(10000); // Should timeout before 10 seconds
-      expect(elapsed).toBeGreaterThan(50); // Should take at least 50ms
+      expect(elapsed).toBeLessThan(10000);
+      expect(elapsed).toBeGreaterThan(50);
     }
   }, 15000);
 });

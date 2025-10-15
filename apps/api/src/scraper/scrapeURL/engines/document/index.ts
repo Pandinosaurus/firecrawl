@@ -86,10 +86,12 @@ export async function scrapeDocument(meta: Meta): Promise<EngineScrapeResult> {
   let response: Response;
   let buffer: Buffer;
   let proxyUsed: "basic" | "stealth" = "basic";
+  let tempFilePath: string | null = null;
 
   if (meta.documentPrefetch !== undefined && meta.documentPrefetch !== null) {
     // Use prefetched document
-    buffer = await readFile(meta.documentPrefetch.filePath);
+    tempFilePath = meta.documentPrefetch.filePath;
+    buffer = await readFile(tempFilePath);
 
     // Create a mock response object with content-type from prefetch
     const headers = new Headers();
@@ -121,21 +123,36 @@ export async function scrapeDocument(meta: Meta): Promise<EngineScrapeResult> {
     }
   }
 
-  const documentType =
-    getDocumentTypeFromContentType(response.headers.get("content-type")) ??
-    getDocumentTypeFromUrl(response.url);
+  try {
+    const documentType =
+      getDocumentTypeFromContentType(response.headers.get("content-type")) ??
+      getDocumentTypeFromUrl(response.url);
 
-  const html = await converter.convertBufferToHtml(
-    new Uint8Array(buffer),
-    documentType,
-  );
+    const html = await converter.convertBufferToHtml(
+      new Uint8Array(buffer),
+      documentType,
+    );
 
-  return {
-    url: response.url,
-    statusCode: response.status,
-    html,
-    proxyUsed,
-  };
+    return {
+      url: response.url,
+      statusCode: response.status,
+      html,
+      proxyUsed,
+    };
+  } finally {
+    // Clean up temporary file if it was created by prefetch
+    if (tempFilePath && meta.documentPrefetch !== undefined && meta.documentPrefetch !== null) {
+      try {
+        await unlink(tempFilePath);
+      } catch (error) {
+        // Ignore errors when cleaning up temp files
+        meta.logger?.warn("Failed to clean up temporary document file", { 
+          error, 
+          tempFilePath 
+        });
+      }
+    }
+  }
 }
 
 export function documentMaxReasonableTime(meta: Meta): number {

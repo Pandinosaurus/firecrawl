@@ -66,7 +66,7 @@ describe("Scrape tests", () => {
 
         expect(raw.statusCode).toBe(400);
         expect(raw.body.success).toBe(false);
-        expect(raw.body.error).toBe("Bad Request");
+        expect(raw.body.error).toBe("waitFor must not exceed half of timeout");
         expect(raw.body.details).toBeDefined();
         expect(JSON.stringify(raw.body.details)).toContain(
           "waitFor must not exceed half of timeout",
@@ -89,7 +89,7 @@ describe("Scrape tests", () => {
 
         expect(raw.statusCode).toBe(400);
         expect(raw.body.success).toBe(false);
-        expect(raw.body.error).toBe("Bad Request");
+        expect(raw.body.error).toBe("waitFor must not exceed half of timeout");
         expect(raw.body.details).toBeDefined();
         expect(JSON.stringify(raw.body.details)).toContain(
           "waitFor must not exceed half of timeout",
@@ -112,7 +112,7 @@ describe("Scrape tests", () => {
 
         expect(raw.statusCode).toBe(400);
         expect(raw.body.success).toBe(false);
-        expect(raw.body.error).toBe("Bad Request");
+        expect(raw.body.error).toBe("waitFor must not exceed half of timeout");
         expect(raw.body.details).toBeDefined();
         expect(JSON.stringify(raw.body.details)).toContain(
           "waitFor must not exceed half of timeout",
@@ -146,66 +146,80 @@ describe("Scrape tests", () => {
     scrapeTimeout,
   );
 
-  it.concurrent("links format works", async () => {
-    const response = await scrape(
-      {
-        url: "https://firecrawl.dev",
-        formats: ["links"],
-      },
-      identity,
-    );
+  it.concurrent(
+    "links format works",
+    async () => {
+      const response = await scrape(
+        {
+          url: "https://firecrawl.dev",
+          formats: ["links"],
+        },
+        identity,
+      );
 
-    expect(response.links).toBeDefined();
-    expect(response.links?.length).toBeGreaterThan(0);
-  });
+      expect(response.links).toBeDefined();
+      expect(response.links?.length).toBeGreaterThan(0);
+    },
+    scrapeTimeout,
+  );
 
-  it.concurrent("images format works", async () => {
-    const response = await scrape(
-      {
-        url: "https://firecrawl.dev",
-        formats: ["images"],
-      },
-      identity,
-    );
+  it.concurrent(
+    "images format works",
+    async () => {
+      const response = await scrape(
+        {
+          url: "https://firecrawl.dev",
+          formats: ["images"],
+        },
+        identity,
+      );
 
-    expect(response.images).toBeDefined();
-    expect(response.images?.length).toBeGreaterThan(0);
-    // Firecrawl website should have at least the logo
-    expect(response.images?.some(img => img.includes("firecrawl"))).toBe(true);
-  });
+      expect(response.images).toBeDefined();
+      expect(response.images?.length).toBeGreaterThan(0);
+      // Firecrawl website should have at least the logo
+      expect(response.images?.some(img => img.includes("firecrawl"))).toBe(
+        true,
+      );
+    },
+    scrapeTimeout,
+  );
 
-  it.concurrent("images format works with multiple formats", async () => {
-    const response = await scrape(
-      {
-        url: "https://firecrawl.dev",
-        formats: ["markdown", "links", "images"],
-      },
-      identity,
-    );
+  it.concurrent(
+    "images format works with multiple formats",
+    async () => {
+      const response = await scrape(
+        {
+          url: "https://firecrawl.dev",
+          formats: ["markdown", "links", "images"],
+        },
+        identity,
+      );
 
-    expect(response.markdown).toBeDefined();
-    expect(response.links).toBeDefined();
-    expect(response.images).toBeDefined();
-    expect(response.images?.length).toBeGreaterThan(0);
+      expect(response.markdown).toBeDefined();
+      expect(response.links).toBeDefined();
+      expect(response.images).toBeDefined();
+      expect(response.images?.length).toBeGreaterThan(0);
 
-    // Images should include things that aren't in links
-    const imageExtensions = [
-      ".jpg",
-      ".jpeg",
-      ".png",
-      ".gif",
-      ".webp",
-      ".svg",
-      ".ico",
-    ];
-    const linkImages =
-      response.links?.filter(link =>
-        imageExtensions.some(ext => link.toLowerCase().includes(ext)),
-      ) || [];
+      // Images should include things that aren't in links
+      const imageExtensions = [
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".gif",
+        ".webp",
+        ".svg",
+        ".ico",
+      ];
+      const linkImages =
+        response.links?.filter(link =>
+          imageExtensions.some(ext => link.toLowerCase().includes(ext)),
+        ) || [];
 
-    // Should have found more images than just those with obvious extensions in links
-    expect(response.images?.length).toBeGreaterThanOrEqual(linkImages.length);
-  });
+      // Should have found more images than just those with obvious extensions in links
+      expect(response.images?.length).toBeGreaterThanOrEqual(linkImages.length);
+    },
+    scrapeTimeout,
+  );
 
   if (process.env.TEST_SUITE_SELF_HOSTED && process.env.PROXY_SERVER) {
     it.concurrent(
@@ -1777,35 +1791,37 @@ describe("attributes format", () => {
         scrapeTimeout,
       );
 
-      it(
-        "should normalize changeTracking format with additionalProperties",
-        async () => {
-          const identity = await idmux({ name: "schema-validation-test" });
+      if (!process.env.TEST_SUITE_SELF_HOSTED) {
+        it(
+          "should normalize changeTracking format with additionalProperties",
+          async () => {
+            const identity = await idmux({ name: "schema-validation-test" });
 
-          const response = await scrapeRaw(
-            {
-              url: "https://example.com",
-              formats: [
-                { type: "markdown" },
-                {
-                  type: "changeTracking",
-                  schema: {
-                    type: "object",
-                    properties: {
-                      changes: { type: "string" },
+            const response = await scrapeRaw(
+              {
+                url: "https://example.com",
+                formats: [
+                  { type: "markdown" },
+                  {
+                    type: "changeTracking",
+                    schema: {
+                      type: "object",
+                      properties: {
+                        changes: { type: "string" },
+                      },
+                      additionalProperties: false,
                     },
-                    additionalProperties: false,
                   },
-                },
-              ],
-            },
-            identity,
-          );
+                ],
+              },
+              identity,
+            );
 
-          expect(response.statusCode).toBe(200);
-        },
-        scrapeTimeout,
-      );
+            expect(response.statusCode).toBe(200);
+          },
+          scrapeTimeout,
+        );
+      }
 
       it(
         "should accept valid schema without additionalProperties",

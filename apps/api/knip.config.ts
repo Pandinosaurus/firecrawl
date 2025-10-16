@@ -7,8 +7,9 @@ const config: KnipConfig = {
       project: ["src/**/*.ts"],
     },
   },
-  ignore: ["native/**"],
-  ignoreDependencies: ["openai"],
+  // TODO: remove search index file / dependency once implemented
+  ignore: ["native/**", "src/services/search-index-db.ts"],
+  ignoreDependencies: ["openai", "@pinecone-database/pinecone"],
 };
 
 export default config;

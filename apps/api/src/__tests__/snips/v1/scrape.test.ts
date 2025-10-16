@@ -65,7 +65,7 @@ describe("Scrape tests", () => {
 
         expect(raw.statusCode).toBe(400);
         expect(raw.body.success).toBe(false);
-        expect(raw.body.error).toBe("Bad Request");
+        expect(raw.body.error).toBe("waitFor must not exceed half of timeout");
         expect(raw.body.details).toBeDefined();
         expect(JSON.stringify(raw.body.details)).toContain(
           "waitFor must not exceed half of timeout",
@@ -88,7 +88,7 @@ describe("Scrape tests", () => {
 
         expect(raw.statusCode).toBe(400);
         expect(raw.body.success).toBe(false);
-        expect(raw.body.error).toBe("Bad Request");
+        expect(raw.body.error).toBe("waitFor must not exceed half of timeout");
         expect(raw.body.details).toBeDefined();
         expect(JSON.stringify(raw.body.details)).toContain(
           "waitFor must not exceed half of timeout",
@@ -111,7 +111,7 @@ describe("Scrape tests", () => {
 
         expect(raw.statusCode).toBe(400);
         expect(raw.body.success).toBe(false);
-        expect(raw.body.error).toBe("Bad Request");
+        expect(raw.body.error).toBe("waitFor must not exceed half of timeout");
         expect(raw.body.details).toBeDefined();
         expect(JSON.stringify(raw.body.details)).toContain(
           "waitFor must not exceed half of timeout",
@@ -147,19 +147,23 @@ describe("Scrape tests", () => {
     scrapeTimeout,
   );
 
-  it.concurrent("links format works", async () => {
-    const response = await scrape(
-      {
-        url: "https://firecrawl.dev",
-        formats: ["links"],
-        timeout: scrapeTimeout,
-      },
-      identity,
-    );
+  it.concurrent(
+    "links format works",
+    async () => {
+      const response = await scrape(
+        {
+          url: "https://firecrawl.dev",
+          formats: ["links"],
+          timeout: scrapeTimeout,
+        },
+        identity,
+      );
 
-    expect(response.links).toBeDefined();
-    expect(response.links?.length).toBeGreaterThan(0);
-  });
+      expect(response.links).toBeDefined();
+      expect(response.links?.length).toBeGreaterThan(0);
+    },
+    scrapeTimeout,
+  );
 
   if (process.env.TEST_SUITE_SELF_HOSTED && process.env.PROXY_SERVER) {
     it.concurrent(

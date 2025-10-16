@@ -56,7 +56,7 @@ RETURNS int8
 LANGUAGE sql
 STABLE
 AS $$
-  SELECT COALESCE(max_concurrency, 100)::int8 FROM nuq.queue_scrape_owner_concurrency_source WHERE id = owner_id LIMIT 1;
+  SELECT COALESCE((SELECT max_concurrency FROM nuq.queue_scrape_owner_concurrency_source WHERE id = owner_id LIMIT 1), 100)::int8;
 $$;
 
 SELECT cron.schedule('nuq_queue_scrape_clean_completed', '*/5 * * * *', $$

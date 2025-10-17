@@ -2,6 +2,9 @@
 // import { scrapeTimeout } from "./lib";
 
 describe("Robots.txt tests", () => {
+  it("robot-dummy", () => {
+    expect(true).toBe(true);
+  });
   // TEMP: disabled due to uuid causing issues with Jest, see: https://github.com/uuidjs/uuid/issues/451
   // const robotsUrl = "https://www.google.com/robots.txt";
   // const siteUrl = "https://www.google.com/";

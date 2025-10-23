@@ -187,12 +187,15 @@ export async function crawlStatusController(
     req.params.jobId,
     req.auth.team_id,
   );
+  const sc = await getCrawl(req.params.jobId);
 
-  if (!group || !groupAnyJob) {
+  if (!group || (!groupAnyJob && (!sc || sc.team_id !== req.auth.team_id))) {
     return res.status(404).json({ success: false, error: "Job not found" });
   }
 
-  const zeroDataRetention = !!groupAnyJob.data.zeroDataRetention;
+  const zeroDataRetention = !!(
+    groupAnyJob?.data?.zeroDataRetention ?? sc?.zeroDataRetention
+  );
 
   const numericStats = await scrapeQueue.getGroupNumericStats(
     req.params.jobId,
@@ -233,8 +236,8 @@ export async function crawlStatusController(
 
   const doneJobs = await scrapeQueue.getCrawlJobsForListing(
     req.params.jobId,
-    start,
     end !== undefined ? end - start : 100,
+    start,
     logger.child({ zeroDataRetention }),
   );
 

@@ -512,7 +512,6 @@ class NuQ<JobData = any, JobReturnValue = any> {
             WHERE ${this.queueName}.group_id = $1
               AND ${this.queueName}.owner_id = $2
               AND ${this.queueName}.data->>'mode' = 'single_urls'
-            AND ${this.queueName}.status = 'completed'
             LIMIT 1;
           `,
           [groupId, normalizeOwnerId(ownerId)],
@@ -531,17 +530,20 @@ class NuQ<JobData = any, JobReturnValue = any> {
         (
           await nuqPool.query(
             `
-              SELECT status, COUNT(*) as count
+              SELECT ${this.queueName}.status::text as status, COUNT(*) as count
               FROM ${this.queueName}
               WHERE ${this.queueName}.group_id = $1
+              AND ${this.queueName}.data->>'mode' = 'single_urls'
+              GROUP BY ${this.queueName}.status
               UNION ALL
-              SELECT 'backlog' as status, COUNT(*) as count
+              SELECT 'backlog'::text as status, COUNT(*) as count
               FROM ${this.queueName}_backlog
-              WHERE ${this.queueName}.group_id = $1
+              WHERE ${this.queueName}_backlog.group_id = $1
+              AND ${this.queueName}_backlog.data->>'mode' = 'single_urls'
             `,
             [groupId],
           )
-        ).rows.map(row => [row.status, row.count]),
+        ).rows.map(row => [row.status, parseInt(row.count, 10)]),
       );
     } finally {
       _logger.info("nuqGetGroupNumericStats metrics", {
@@ -569,6 +571,7 @@ class NuQ<JobData = any, JobReturnValue = any> {
             FROM ${this.queueName}
             WHERE ${this.queueName}.group_id = $1
             AND ${this.queueName}.status = 'completed'
+            AND ${this.queueName}.data->>'mode' = 'single_urls'
             ORDER BY finished_at ASC, created_at ASC
             LIMIT $2 OFFSET $3;
           `,

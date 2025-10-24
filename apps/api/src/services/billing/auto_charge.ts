@@ -307,7 +307,7 @@ async function _autoChargeScale(
 
           if (process.env.SLACK_ADMIN_WEBHOOK_URL) {
             sendSlackWebhook(
-              `💰 Auto-recharge successful on team ${chunk.team_id} for ${price.credits} credits (total auto-recharges this month: ${rechargesThisMonth.length}).`,
+              `💰 Auto-recharge successful on team ${chunk.team_id} for ${price.credits} credits (total auto-recharges this month: ${rechargesThisMonth.length + 1}).`,
               false,
               process.env.SLACK_ADMIN_WEBHOOK_URL,
             ).catch(error => {

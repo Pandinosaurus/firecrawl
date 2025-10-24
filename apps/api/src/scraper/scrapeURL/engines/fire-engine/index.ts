@@ -303,11 +303,12 @@ export async function scrapeURLWithFireEngineChromeCDP(
         !meta.internalOptions.zeroDataRetention &&
         meta.internalOptions.saveScrapeResultToGCS,
       zeroDataRetention: meta.internalOptions.zeroDataRetention,
-      ...(youtubePostprocessor.shouldRun(
+      ...(hasFormatOfType(meta.options.formats, "branding") ||
+      youtubePostprocessor.shouldRun(
         meta,
         new URL(meta.rewrittenUrl ?? meta.url),
       )
-        ? { blockMedia: false }
+        ? { blockMedia: false } // Allow CSS and other resources needed for branding
         : {}),
     };
 

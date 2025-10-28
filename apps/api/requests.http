@@ -9,8 +9,7 @@ Authorization: Bearer {{$dotenv TEST_API_KEY}}
 content-type: application/json
 
 {
-  "url": "https://firecrawl.dev",
-  "formats": [{ "type": "branding" }]
+  "url": "https://firecrawl.dev"
 }
 
 ### Crawl Website

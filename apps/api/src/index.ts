@@ -35,7 +35,6 @@ import { nuqShutdown } from "./services/worker/nuq";
 import { getErrorContactMessage } from "./lib/deployment";
 import { initializeBlocklist } from "./scraper/WebScraper/utils/blocklist";
 import responseTime from "response-time";
-import path from "path";
 
 const { createBullBoard } = require("@bull-board/api");
 const { BullMQAdapter } = require("@bull-board/api/bullMQAdapter");
@@ -96,14 +95,6 @@ app.get("/", (req, res) => {
 //write a simple test function
 app.get("/test", async (req, res) => {
   res.send("Hello, world!");
-});
-
-// Serve branding demo page
-// Point to source public folder (works in both dev and prod since public is copied to dist)
-const publicPath = path.join(__dirname, "../public");
-app.use("/demo", express.static(publicPath));
-app.get("/demo/branding", (req, res) => {
-  res.sendFile(path.join(publicPath, "branding-demo.html"));
 });
 
 // register router

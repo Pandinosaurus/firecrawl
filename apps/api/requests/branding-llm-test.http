@@ -1,84 +1,29 @@
-### Test 1: Branding with LLM (Supabase - complex Tailwind classes)
 POST http://localhost:3002/v2/scrape
 Content-Type: application/json
 
 {
   "url": "https://supabase.com",
   "formats": [
-    { "type": "branding" },
-    { "type": "screenshot" }
+    { "type": "branding" }
   ]
 }
 
-###
-
-### Test 2: Branding with LLM (Vercel - dark mode, Next.js fonts)
 POST http://localhost:3002/v2/scrape
 Content-Type: application/json
 
 {
   "url": "https://vercel.com",
   "formats": [
-    { "type": "branding" },
-    { "type": "screenshot" }
+    { "type": "branding" }
   ]
 }
 
-###
-
-### Test 3: Branding with LLM (Firecrawl - our own site!)
 POST http://localhost:3002/v2/scrape
 Content-Type: application/json
 
 {
   "url": "https://firecrawl.dev",
   "formats": [
-    { "type": "branding" },
-    { "type": "screenshot" }
-  ]
-}
-
-###
-
-### Test 4: Branding WITHOUT screenshot (LLM will use HTML only)
-POST http://localhost:3002/v2/scrape
-Content-Type: application/json
-
-{
-  "url": "https://linear.app",
-  "formats": [
     { "type": "branding" }
   ]
 }
-
-###
-
-### Test 5: Check confidence scores (Stripe - custom design system)
-POST http://localhost:3002/v2/scrape
-Content-Type: application/json
-
-{
-  "url": "https://stripe.com",
-  "formats": [
-    { "type": "branding" },
-    { "type": "screenshot" }
-  ]
-}
-
-###
-
-### Demo: View branding in UI
-# Open in browser: http://localhost:3002/demo/branding
-
-###
-
-### Notes:
-# - LLM ALWAYS runs for branding (as per requirements)
-# - Screenshot is optional but improves accuracy
-# - JS analysis runs first (~200ms), then LLM enhances (~2-5s)
-# - Check response for:
-#   - branding.personality (tone, energy, target_audience)
-#   - branding.design_system (framework, component_library)
-#   - branding.confidence (buttons, colors, overall scores)
-# - Falls back to JS-only if LLM fails
-

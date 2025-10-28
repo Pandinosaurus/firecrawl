@@ -219,8 +219,6 @@ export async function fireEngineScrape<
     logger.debug("Scrape job failed", {
       status,
     });
-
-    console.log("🔥 status", status);
     if (
       typeof status.error === "string" &&
       status.error.includes("Chrome error: ")

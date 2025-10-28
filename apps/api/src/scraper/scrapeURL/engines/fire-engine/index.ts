@@ -35,13 +35,7 @@ import { youtubePostprocessor } from "../../postprocessors/youtube";
 import { withSpan, setSpanAttributes } from "../../../../lib/otel-tracer";
 import { BrandingProfile } from "../../../../types/branding";
 
-import { readFileSync } from "fs";
-import { join } from "path";
-
-const loadBrandingScript = () =>
-  readFileSync(join(__dirname, "brandingScript.js"), "utf-8");
-
-const brandingScript = loadBrandingScript();
+import { brandingScript } from "./brandingScript";
 
 // This function does not take `Meta` on purpose. It may not access any
 // meta values to construct the request -- that must be done by the

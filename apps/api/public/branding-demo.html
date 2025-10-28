@@ -524,7 +524,8 @@
         branding.fonts.forEach(font => {
           // Handle both string and object formats
           const fontName = typeof font === 'string' ? font : font.family;
-          html += `<div class="font-item"><div class="font-name">${fontName}</div></div>`;
+          const fontRole = typeof font === 'object' && font.role ? ` <span style="color: #999; font-size: 0.85em;">(${font.role})</span>` : '';
+          html += `<div class="font-item"><div class="font-name">${fontName}${fontRole}</div></div>`;
         });
         
         html += '</div></div>';

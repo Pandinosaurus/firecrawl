@@ -32,13 +32,13 @@ const brandingEnhancementSchema = z.object({
 
   // Color role clarification
   color_roles: z.object({
-    primary_color: z.string().optional().describe("Main brand color (hex)"),
-    accent_color: z.string().optional().describe("Accent/CTA color (hex)"),
+    primary_color: z.string().nullish().describe("Main brand color (hex)"),
+    accent_color: z.string().nullish().describe("Accent/CTA color (hex)"),
     background_color: z
       .string()
-      .optional()
+      .nullish()
       .describe("Main background color (hex)"),
-    text_primary: z.string().optional().describe("Primary text color (hex)"),
+    text_primary: z.string().nullish().describe("Primary text color (hex)"),
     confidence: z.number().min(0).max(1),
   }),
 
@@ -75,10 +75,26 @@ const brandingEnhancementSchema = z.object({
         .describe("Detected CSS framework"),
       component_library: z
         .string()
-        .optional()
+        .nullish()
         .describe("Detected component library (e.g., radix-ui, shadcn)"),
     })
     .optional(),
+
+  // Font cleaning - LLM cleans and filters font names
+  cleaned_fonts: z
+    .array(
+      z.object({
+        family: z.string().describe("Cleaned, human-readable font name"),
+        role: z
+          .enum(["heading", "body", "monospace", "display"])
+          .nullish()
+          .describe("Font role/usage"),
+      }),
+    )
+    .max(5)
+    .describe(
+      "Top 5 cleaned fonts (remove obfuscation, fallbacks, generics, CSS vars)",
+    ),
 });
 
 type BrandingEnhancement = z.infer<typeof brandingEnhancementSchema>;
@@ -144,6 +160,7 @@ export async function enhanceBrandingWithLLM(
     console.error("LLM branding enhancement failed:", error);
     // Return default/fallback
     return {
+      cleaned_fonts: [],
       button_classification: {
         primary_button_index: -1,
         primary_button_reasoning: "LLM failed",
@@ -174,8 +191,20 @@ function buildBrandingPrompt(input: BrandingLLMInput): string {
     });
   }
 
-  if (js_analysis.fonts) {
-    prompt += `\nFonts: ${js_analysis.fonts.join(", ")}\n`;
+  if (js_analysis.fonts && js_analysis.fonts.length > 0) {
+    prompt += `\nRaw Fonts (need cleaning):\n`;
+    js_analysis.fonts.forEach((font: any) => {
+      const family = typeof font === "string" ? font : font.family;
+      const count = typeof font === "object" && font.count ? font.count : "";
+      prompt += `- ${family}${count ? ` (used ${count}x)` : ""}\n`;
+    });
+    prompt += `\n**FONT CLEANING INSTRUCTIONS:**\n`;
+    prompt += `- Remove obfuscated names (e.g., "__suisse_6d5c28" → "Suisse", "__Roboto_Mono_c8ca7d" → "Roboto Mono")\n`;
+    prompt += `- Skip fallback fonts (e.g., "__suisse_Fallback_6d5c28" → ignore)\n`;
+    prompt += `- Skip CSS variables (e.g., "var(--font-sans)" → ignore)\n`;
+    prompt += `- Skip generic fonts (e.g., "system-ui", "sans-serif", "ui-sans-serif" → ignore)\n`;
+    prompt += `- Keep only real, meaningful brand fonts (max 5)\n`;
+    prompt += `- Assign roles based on usage: heading, body, monospace, display\n\n`;
   }
 
   // Helper to analyze color vibrancy
@@ -227,9 +256,45 @@ function buildBrandingPrompt(input: BrandingLLMInput): string {
     };
   };
 
+  // Collect class patterns for framework detection
+  const allClasses = new Set<string>();
+  if (buttons && buttons.length > 0) {
+    buttons.forEach(btn => {
+      if (btn.classes) {
+        btn.classes.split(/\s+/).forEach(cls => {
+          if (cls.length > 0 && cls.length < 50) {
+            allClasses.add(cls);
+          }
+        });
+      }
+    });
+  }
+
+  // Add framework detection hints
+  if (allClasses.size > 0) {
+    const classSample = Array.from(allClasses).slice(0, 50).join(", ");
+    prompt += `\n## CSS Class Patterns (for framework detection):\n`;
+    prompt += `Sample classes: ${classSample}\n`;
+
+    // Add framework hints from meta/scripts
+    if (
+      (js_analysis as any).__framework_hints &&
+      (js_analysis as any).__framework_hints.length > 0
+    ) {
+      prompt += `Framework hints from page: ${(js_analysis as any).__framework_hints.join(", ")}\n`;
+    }
+
+    prompt += `\n**Framework Detection Patterns:**\n`;
+    prompt += `- Tailwind: Look for utility classes like \`flex\`, \`items-center\`, \`px-*\`, \`py-*\`, \`bg-*-500\`, \`rounded-*\`, \`text-*\`, \`space-x-*\`, \`gap-*\`\n`;
+    prompt += `- Bootstrap: Look for \`btn\`, \`btn-primary\`, \`container\`, \`row\`, \`col-*\`, \`d-flex\`, \`justify-*\`, \`mb-*\`, \`mt-*\`\n`;
+    prompt += `- Material UI: Look for \`MuiButton\`, \`Mui*\`, \`makeStyles\`, or modern Material classes\n`;
+    prompt += `- Chakra UI: Look for \`chakra-*\`, minimal utility-style classes, or data attributes\n`;
+    prompt += `- Custom: Mixed or unique class patterns that don't match standard frameworks\n\n`;
+  }
+
   // Add button context with detailed info
   if (buttons && buttons.length > 0) {
-    prompt += `\n## Detected Buttons (${buttons.length} total):\n`;
+    prompt += `## Detected Buttons (${buttons.length} total):\n`;
     prompt += `Analyze these buttons and identify which is the PRIMARY CTA and which is SECONDARY:\n\n`;
 
     buttons.forEach((btn, idx) => {
@@ -273,7 +338,16 @@ function buildBrandingPrompt(input: BrandingLLMInput): string {
 
   prompt += `4. **Brand Personality**: Overall tone and energy\n\n`;
 
-  prompt += `5. **Design System**: CSS framework or component library\n\n`;
+  prompt += `5. **Design System**: Based on the class patterns shown above:\n`;
+  prompt += `   - **Framework**: Identify the CSS framework (tailwind/bootstrap/material/chakra/custom/unknown)\n`;
+  prompt += `   - **Component Library**: Look for prefixes like \`radix-\`, \`shadcn-\`, \`headlessui-\`, or \`react-aria-\` in classes\n`;
+  prompt += `   - If using Tailwind + a component library, identify both (e.g., framework: tailwind, component_library: "radix-ui")\n\n`;
+
+  prompt += `6. **Clean Fonts**: Return up to 5 cleaned, human-readable font names\n`;
+  prompt += `   - Remove framework obfuscation (Next.js hashes, etc.)\n`;
+  prompt += `   - Filter out generics and CSS variables\n`;
+  prompt += `   - Prioritize by frequency (shown in usage count)\n`;
+  prompt += `   - Assign appropriate roles (heading, body, monospace, display)\n\n`;
 
   prompt += `**IMPORTANT**: Be decisive and confident. Prioritize vibrant, saturated colors over neutral ones for primary buttons. If no clear primary/secondary, return -1 for that index.`;
 
@@ -386,6 +460,26 @@ export function mergeBrandingResults(
   // Add design system insights
   if (llm.design_system) {
     (merged as any).design_system = llm.design_system;
+  }
+
+  // Override fonts with LLM-cleaned versions (if provided)
+  if (llm.cleaned_fonts && llm.cleaned_fonts.length > 0) {
+    merged.fonts = llm.cleaned_fonts;
+
+    // Also update typography section with cleaned font names
+    if (merged.typography?.font_families) {
+      // Find fonts by role from LLM
+      const headingFont = llm.cleaned_fonts.find(f => f.role === "heading");
+      const bodyFont = llm.cleaned_fonts.find(f => f.role === "body");
+      const primaryFont = bodyFont || llm.cleaned_fonts[0]; // Default to first font
+
+      if (headingFont) {
+        merged.typography.font_families.heading = headingFont.family;
+      }
+      if (primaryFont) {
+        merged.typography.font_families.primary = primaryFont.family;
+      }
+    }
   }
 
   // Add confidence scores

@@ -1,6 +1,12 @@
 /**
+ * Browser script for extracting branding information from web pages.
+ * This script is injected and executed in the page context.
+ */
+
+export const brandingScript = `
+/**
  * Extracts brand design elements from the page.
- * This script is executed in the page context using `await page.evaluate(() => { ... });`.
+ * This script is executed in the page context using \`await page.evaluate(() => { ... });\`.
  
  * @returns {Promise<BrandDesign>} A promise that resolves to the brand design elements.
  */
@@ -26,24 +32,7 @@
 
   const dedupe = arr => Array.from(new Set(arr.filter(Boolean)));
 
-  const cleanNextJsFontName = fontName => {
-    // Clean up Next.js font names like "__suisse_6d5c28" -> "Suisse"
-    // or "__Roboto_Mono_c8ca7d" -> "Roboto Mono"
-    // or "__suisse_Fallback_6d5c28" -> skip (it's a fallback)
-    if (fontName.startsWith("__")) {
-      // Skip fallback fonts
-      if (fontName.includes("_Fallback_")) return null;
-
-      // Remove leading underscores and trailing hash (_6d5c28)
-      const cleaned = fontName.replace(/^__/, "").replace(/_[a-f0-9]{6}$/, "");
-      // Replace underscores with spaces and capitalize each word
-      return cleaned
-        .split("_")
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-        .join(" ");
-    }
-    return fontName;
-  };
+  // Font cleaning moved to LLM for better intelligence
 
   // Resolves CSS variables in SVG elements by replacing them with computed values
   const resolveSvgStyles = svg => {
@@ -138,19 +127,19 @@
 
     // Try parsing Display P3 or other color() formats with alpha
     const colorMatchWithAlpha = rgba.match(
-      /color\((?:display-p3|srgb)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\/\s*([\d.]+)/i,
+      /color\\((?:display-p3|srgb)\\s+([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)\\s*\\/\\s*([\\d.]+)/i,
     );
     if (colorMatchWithAlpha) {
       const [r, g, b, a] = colorMatchWithAlpha
         .slice(1, 5)
         .map(n => parseFloat(n));
       const rgb = [r, g, b].map(n => clamp(Math.round(n * 255), 0, 255));
-      return `rgba(${rgb[0]}, ${rgb[1]}, ${rgb[2]}, ${a.toFixed(2)})`;
+      return \`rgba(\${rgb[0]}, \${rgb[1]}, \${rgb[2]}, \${a.toFixed(2)})\`;
     }
 
     // Try parsing Display P3 or other color() formats without alpha
     const colorMatch = rgba.match(
-      /color\((?:display-p3|srgb)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)/i,
+      /color\\((?:display-p3|srgb)\\s+([\\d.]+)\\s+([\\d.]+)\\s+([\\d.]+)/i,
     );
     if (colorMatch) {
       const [r, g, b] = colorMatch
@@ -167,15 +156,15 @@
 
     // Try direct parsing for rgba() format with alpha
     const rgbaMatch = rgba.match(
-      /^rgba?\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)/i,
+      /^rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+),\\s*([\\d.]+)/i,
     );
     if (rgbaMatch) {
       const [r, g, b, a] = rgbaMatch.slice(1, 5);
-      return `rgba(${r}, ${g}, ${b}, ${parseFloat(a).toFixed(2)})`;
+      return \`rgba(\${r}, \${g}, \${b}, \${parseFloat(a).toFixed(2)})\`;
     }
 
     // Try direct parsing for rgb() format
-    const directMatch = rgba.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+    const directMatch = rgba.match(/^rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)/i);
     if (directMatch) {
       const [r, g, b] = directMatch
         .slice(1, 4)
@@ -194,7 +183,7 @@
     if (!ctx) return null;
     ctx.fillStyle = rgba;
     const val = ctx.fillStyle;
-    const m = val.match(/^rgba?\((\d+),\s*(\d+),\s*(\d+)/i);
+    const m = val.match(/^rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)/i);
     if (!m) return null;
     const [r, g, b] = m.slice(1, 4).map(n => clamp(parseInt(n, 10), 0, 255));
     return (
@@ -222,7 +211,7 @@
     // Handle rgba() format
     if (color.startsWith("rgba(") || color.startsWith("rgb(")) {
       // Reject fully transparent colors (alpha = 0)
-      const match = color.match(/rgba?\([^,]+,[^,]+,[^,]+(?:,\s*([0-9.]+))?\)/);
+      const match = color.match(/rgba?\\([^,]+,[^,]+,[^,]+(?:,\\s*([0-9.]+))?\\)/);
       if (match && match[1] !== undefined) {
         const alpha = parseFloat(match[1]);
         if (alpha === 0 || alpha < 0.01) return false; // Transparent
@@ -243,8 +232,6 @@
     const data = {
       cssVars: {},
       colors: [],
-      fonts: [],
-      fontFaces: [],
       radii: [],
       spacings: [],
     };
@@ -280,17 +267,6 @@
               "fill",
               "stroke",
             ].forEach(prop => pushColor(s.getPropertyValue(prop)));
-            ["font", "font-family"].forEach(prop => {
-              const val = s.getPropertyValue(prop);
-              if (val) {
-                // Split by comma to get all fonts in the stack
-                const fontStack = val
-                  .split(",")
-                  .map(f => f.replace(/["']/g, "").trim())
-                  .filter(Boolean);
-                data.fonts.push(...fontStack);
-              }
-            });
             [
               "border-radius",
               "border-top-left-radius",
@@ -319,16 +295,8 @@
               const v = toPx(s.getPropertyValue(p));
               if (v) data.spacings.push(v);
             });
-          } else if (rule.type === CSSRule.FONT_FACE_RULE) {
-            const s = rule.style;
-            const fam = s
-              .getPropertyValue("font-family")
-              ?.replace(/["']/g, "")
-              .trim();
-            const src = s.getPropertyValue("src") || "";
-            data.fontFaces.push({ family: fam || "", src });
-            if (fam) data.fonts.push(fam);
           }
+          // Skip @font-face rules - we get fonts from rendered elements instead
         } catch {}
       }
     }
@@ -369,12 +337,13 @@
     const bc = hexify(bcRaw);
     const radius = toPx(cs.getPropertyValue("border-radius"));
     const fw = parseInt(cs.getPropertyValue("font-weight"), 10) || null;
-    const ffRaw = cs
+    // Get full font stack (including fallbacks) for better context
+    const fontStack = cs
       .getPropertyValue("font-family")
-      ?.split(",")[0]
-      ?.replace(/["']/g, "")
-      .trim();
-    const ff = ffRaw ? cleanNextJsFontName(ffRaw) || ffRaw : null;
+      ?.split(",")
+      .map(f => f.replace(/["']/g, "").trim())
+      .filter(Boolean) || [];
+    const ff = fontStack[0] || null; // Primary font for backward compatibility
     const fs = cs.getPropertyValue("font-size");
 
     // Get class names - ALWAYS use getAttribute as it's most reliable
@@ -414,7 +383,7 @@
       text: (el.textContent && el.textContent.trim().substring(0, 100)) || "", // Add text content
       rect: { w: rect.width, h: rect.height },
       colors: { text: color, background: bg, border: bc, borderWidth },
-      typography: { family: ff, size: fs || null, weight: fw },
+      typography: { family: ff, fontStack, size: fs || null, weight: fw }, // Include full font stack
       radius,
       isButton: el.matches(
         'button,[role=button],a.button,a.btn,[class*="btn"],a[class*="bg-brand"],a[class*="bg-primary"],a[class*="bg-accent"],a[class*="-button"]',
@@ -573,15 +542,20 @@
 
   const inferTypography = () => {
     const pickFF = el => {
-      const ff = getComputedStyle(el)
-        .fontFamily?.split(",")[0]
-        ?.replace(/["']/g, "")
-        .trim();
-      if (!ff) return null;
-      // Clean Next.js font names
-      const cleaned = cleanNextJsFontName(ff);
-      return cleaned || ff;
+      const fontStack = getComputedStyle(el)
+        .fontFamily?.split(",")
+        .map(f => f.replace(/["']/g, "").trim())
+        .filter(Boolean) || [];
+      return fontStack[0] || null;
     };
+    
+    const pickFontStack = el => {
+      return getComputedStyle(el)
+        .fontFamily?.split(",")
+        .map(f => f.replace(/["']/g, "").trim())
+        .filter(Boolean) || [];
+    };
+    
     const h1 = document.querySelector("h1") || document.body;
     const p = document.querySelector("p") || document.body;
     const body = document.body;
@@ -590,6 +564,11 @@
       font_families: {
         primary: pickFF(body) || "system-ui, sans-serif",
         heading: pickFF(h1) || pickFF(body) || "system-ui, sans-serif",
+      },
+      font_stacks: {
+        primary: pickFontStack(body),
+        heading: pickFontStack(h1),
+        body: pickFontStack(p),
       },
       font_sizes: {
         h1: getComputedStyle(h1).fontSize || "32px",
@@ -652,60 +631,19 @@
     );
   };
 
-  const inferFontsList = (fontFaces, cssFonts) => {
-    const allFonts = fontFaces
-      .map(f => f.family)
-      .concat(cssFonts)
-      .filter(Boolean);
-
-    // Resolve CSS variables and clean font names
-    const resolvedFonts = allFonts
-      .map(f => {
-        // Skip CSS variables (var()) - they should have been resolved in CSS collection
-        if (f.includes("var(")) return null;
-
-        // Clean Next.js font names
-        return cleanNextJsFontName(f);
-      })
-      .filter(Boolean);
-
-    // Count frequency of each font
+  const inferFontsList = (usedFonts = []) => {
+    // Only include fonts that are actually rendered on the page
+    // Skip CSS-defined fonts that aren't used
     const freq = {};
-    for (const f of resolvedFonts) {
-      freq[f] = (freq[f] || 0) + 1;
+    for (const f of usedFonts) {
+      if (f) freq[f] = (freq[f] || 0) + 1;
     }
 
-    // Filter out generic/system font names and sort by frequency
-    const filtered = Object.keys(freq)
-      .filter(f => {
-        const generic = [
-          "inherit",
-          "initial",
-          "unset",
-          "revert",
-          "ui-sans-serif",
-          "ui-serif",
-          "ui-monospace",
-          "system-ui",
-          "sans-serif",
-          "serif",
-          "monospace",
-          "cursive",
-          "fantasy",
-          "math",
-          "emoji",
-          "fangsong",
-          "apple color emoji",
-          "segoe ui emoji",
-          "segoe ui symbol",
-          "noto color emoji",
-        ];
-        return !generic.includes(f.toLowerCase());
-      })
+    // Sort by frequency and return top 10 (LLM will clean and filter)
+    return Object.keys(freq)
       .sort((a, b) => freq[b] - freq[a])
-      .slice(0, 5); // Limit to top 5 most used fonts
-
-    return filtered.map(f => ({ family: f }));
+      .slice(0, 10)
+      .map(f => ({ family: f, count: freq[f] }));
   };
 
   // Main execution
@@ -724,7 +662,7 @@
         return null;
 
       // Parse rgba or rgb
-      const match = colorStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+      const match = colorStr.match(/rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)/);
       if (!match) return null;
 
       const [r, g, b] = match.slice(1, 4).map(n => parseInt(n, 10));
@@ -797,7 +735,21 @@
   const baseUnit = inferBaseUnit(cssData.spacings);
   const borderRadius = pickBorderRadius(snaps);
   const images = findImages();
-  const fontsList = inferFontsList(cssData.fontFaces, cssData.fonts);
+  
+  // Collect all fonts from rendered elements including fallbacks
+  // Flatten font stacks from typography (body, headings)
+  const typographyFontStacks = typography.font_stacks 
+    ? Object.values(typography.font_stacks).flat().filter(Boolean)
+    : [];
+  
+  // Flatten font stacks from sampled elements (buttons, links, etc.)
+  const elementFontStacks = snaps
+    .map(s => s.typography?.fontStack || [])
+    .flat()
+    .filter(Boolean);
+  
+  // Combine all fonts including fallbacks for better context
+  const fontsList = inferFontsList([...typographyFontStacks, ...elementFontStacks]);
   const components = buildComponents(snaps);
   const colorScheme = detectColorScheme();
 
@@ -809,6 +761,36 @@
       images.find(i => i.type === "twitter")?.src ||
       null,
   };
+  
+  // Detect framework hints from meta tags and scripts
+  const detectFrameworkHints = () => {
+    const hints = [];
+    
+    // Check meta generator
+    const generator = document.querySelector('meta[name="generator"]');
+    if (generator) {
+      hints.push(generator.getAttribute('content') || '');
+    }
+    
+    // Check for framework-specific script tags
+    const scripts = Array.from(document.querySelectorAll('script[src]'))
+      .map(s => s.getAttribute('src') || '')
+      .filter(Boolean);
+    
+    if (scripts.some(s => s.includes('tailwind') || s.includes('cdn.tailwindcss'))) {
+      hints.push('tailwind-detected-in-scripts');
+    }
+    if (scripts.some(s => s.includes('bootstrap'))) {
+      hints.push('bootstrap-detected-in-scripts');
+    }
+    if (scripts.some(s => s.includes('mui') || s.includes('material-ui'))) {
+      hints.push('material-ui-detected-in-scripts');
+    }
+    
+    return hints.filter(Boolean);
+  };
+  
+  const frameworkHints = detectFrameworkHints();
 
   // Extract button snapshots for LLM
   const buttonSnapshots = snaps
@@ -841,6 +823,7 @@
     components,
     images: imagesOut,
     __button_snapshots: buttonSnapshots, // For LLM analysis
+    __framework_hints: frameworkHints, // For LLM framework detection
   };
 
   // Clean null/undefined/empty values
@@ -869,3 +852,4 @@
 
   return clean(result);
 })();
+`;

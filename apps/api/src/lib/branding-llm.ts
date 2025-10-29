@@ -219,9 +219,9 @@ function buildBrandingPrompt(input: BrandingLLMInput): string {
       b = 0;
     if (colorStr.startsWith("#")) {
       const hex = colorStr.replace("#", "");
-      r = parseInt(hex.substr(0, 2), 16);
-      g = parseInt(hex.substr(2, 2), 16);
-      b = parseInt(hex.substr(4, 2), 16);
+      r = parseInt(hex.substring(0, 2), 16);
+      g = parseInt(hex.substring(2, 2), 16);
+      b = parseInt(hex.substring(4, 2), 16);
     } else {
       const match = colorStr.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
       if (match) {

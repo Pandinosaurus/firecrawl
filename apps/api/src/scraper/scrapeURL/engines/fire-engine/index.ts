@@ -273,6 +273,13 @@ export async function scrapeURLWithFireEngineChromeCDP(
       0,
     );
 
+    const shouldAllowMedia =
+      hasFormatOfType(meta.options.formats, "branding") ||
+      youtubePostprocessor.shouldRun(
+        meta,
+        new URL(meta.rewrittenUrl ?? meta.url),
+      );
+
     const request: FireEngineScrapeRequestCommon &
       FireEngineScrapeRequestChromeCDP = {
       url: meta.rewrittenUrl ?? meta.url,
@@ -295,13 +302,7 @@ export async function scrapeURLWithFireEngineChromeCDP(
         !meta.internalOptions.zeroDataRetention &&
         meta.internalOptions.saveScrapeResultToGCS,
       zeroDataRetention: meta.internalOptions.zeroDataRetention,
-      ...(hasFormatOfType(meta.options.formats, "branding") ||
-      youtubePostprocessor.shouldRun(
-        meta,
-        new URL(meta.rewrittenUrl ?? meta.url),
-      )
-        ? { blockMedia: false } // Allow CSS and other resources needed for branding
-        : {}),
+      ...(shouldAllowMedia ? { blockMedia: false } : {}),
     };
 
     let response = await performFireEngineScrape(

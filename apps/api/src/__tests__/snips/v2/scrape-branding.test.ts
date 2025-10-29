@@ -229,8 +229,10 @@ describeIf(ALLOW_TEST_SUITE_WEBSITE)("Branding extraction", () => {
         expect(response.branding?.confidence).toBeDefined();
 
         if (response.branding?.confidence) {
-          expect(response.branding.confidence).toBeGreaterThanOrEqual(0);
-          expect(response.branding.confidence).toBeLessThanOrEqual(1);
+          expect(response.branding.confidence.overall).toBeGreaterThanOrEqual(
+            0,
+          );
+          expect(response.branding.confidence.overall).toBeLessThanOrEqual(1);
         }
       },
       scrapeTimeout,

@@ -112,15 +112,6 @@ function contrastYIQ(hex: string): number {
   return (r * 299 + g * 587 + b * 114) / 1000;
 }
 
-// Check if color is valid (not pure black/white/transparent)
-function isColorValid(color: string | null): boolean {
-  if (!color) return false;
-  if (color.includes("transparent")) return false;
-  if (/^#(FFF(FFF)?|000(000)?|F{6}|0{6})$/i.test(color)) return false;
-  const yiq = contrastYIQ(color);
-  return yiq < 240;
-}
-
 // Infer color palette from snapshots
 function inferPalette(
   snapshots: RawBrandingData["snapshots"],

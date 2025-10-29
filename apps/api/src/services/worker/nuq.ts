@@ -417,16 +417,18 @@ class NuQ<JobData = any, JobReturnValue = any> {
 
         return result;
       } finally {
-        const duration = Date.now() - start;
-        setSpanAttributes(span, {
-          "nuq.duration_ms": duration,
-        });
-        _logger.info("nuqGetJob metrics", {
-          module: "nuq/metrics",
-          method: "nuqGetJob",
-          duration,
-          scrapeId: id,
-        });
+        if (process.env.CI !== "true") {
+          const duration = Date.now() - start;
+          setSpanAttributes(span, {
+            "nuq.duration_ms": duration,
+          });
+          _logger.info("nuqGetJob metrics", {
+            module: "nuq/metrics",
+            method: "nuqGetJob",
+            duration,
+            scrapeId: id,
+          });
+        }
       }
     });
   }

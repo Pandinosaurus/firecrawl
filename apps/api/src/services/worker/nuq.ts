@@ -746,7 +746,7 @@ class NuQ<JobData = any, JobReturnValue = any> {
         );
 
         setSpanAttributes(span, {
-          "nuq.job_created": true,
+          "nuq.job_created": result !== null,
         });
 
         return result;

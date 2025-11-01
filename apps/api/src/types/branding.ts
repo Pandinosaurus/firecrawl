@@ -130,5 +130,19 @@ export interface BrandingProfile {
     energy: "low" | "medium" | "high";
     targetAudience: string;
   };
+  // Debug information (kept for troubleshooting button selection)
+  __llm_button_reasoning?: {
+    primary: {
+      index: number;
+      text: string;
+      reasoning: string;
+    };
+    secondary: {
+      index: number;
+      text: string;
+      reasoning: string;
+    };
+    confidence: number;
+  };
   [key: string]: unknown;
 }

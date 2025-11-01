@@ -28,7 +28,10 @@ interface RawBrandingData {
       weight: number | null;
     };
     radius: number | null;
+    shadow: string | null;
     isButton: boolean;
+    isNavigation?: boolean;
+    hasCTAIndicator?: boolean;
     isInput: boolean;
     isLink: boolean;
   }>;
@@ -309,7 +312,48 @@ export function processRawBranding(raw: RawBrandingData): BrandingProfile {
 
       return true;
     })
-    .sort((a, b) => b.rect.w * b.rect.h - a.rect.w * a.rect.h)
+    .map(s => {
+      let score = 0;
+
+      if (s.hasCTAIndicator) score += 1000;
+
+      const text = (s.text || "").toLowerCase();
+      const ctaKeywords = [
+        "sign up",
+        "get started",
+        "start deploying",
+        "start",
+        "deploy",
+        "try",
+        "demo",
+        "contact",
+        "buy",
+        "subscribe",
+        "join",
+        "register",
+        "get",
+        "free",
+      ];
+      if (ctaKeywords.some(kw => text.includes(kw))) score += 500;
+
+      const bgHex = hexify(s.colors.background);
+      if (
+        bgHex &&
+        bgHex !== "#FFFFFF" &&
+        bgHex !== "#FAFAFA" &&
+        bgHex !== "#F5F5F5"
+      ) {
+        score += 300;
+      }
+
+      if (text.length > 0 && text.length < 50) score += 100;
+
+      const area = (s.rect.w || 0) * (s.rect.h || 0);
+      score += Math.log10(area + 1) * 10;
+
+      return { ...s, _score: score };
+    })
+    .sort((a: any, b: any) => (b._score || 0) - (a._score || 0))
     .slice(0, 20)
     .map((s, idx) => {
       let bgHex = hexify(s.colors.background);
@@ -331,6 +375,7 @@ export function processRawBranding(raw: RawBrandingData): BrandingProfile {
         textColor: hexify(s.colors.text) || "#000000",
         borderColor: borderHex,
         borderRadius: s.radius ? `${s.radius}px` : "0px",
+        shadow: s.shadow || null,
       };
     });
 

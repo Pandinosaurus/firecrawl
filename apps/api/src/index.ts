@@ -35,6 +35,7 @@ import { nuqShutdown } from "./services/worker/nuq";
 import { getErrorContactMessage } from "./lib/deployment";
 import { initializeBlocklist } from "./scraper/WebScraper/utils/blocklist";
 import responseTime from "response-time";
+import path from "node:path";
 
 const { createBullBoard } = require("@bull-board/api");
 const { BullMQAdapter } = require("@bull-board/api/bullMQAdapter");
@@ -55,6 +56,11 @@ cacheableLookup.install(https.globalAgent);
 const expressApp = express();
 const ws = expressWs(expressApp);
 const app = ws.app;
+const publicDir = path.join(__dirname, "../public");
+
+app.get("/branding-demo", (req, res) => {
+  res.sendFile(path.join(publicDir, "branding-demo.html"));
+});
 
 global.isProduction = process.env.IS_PRODUCTION === "true";
 

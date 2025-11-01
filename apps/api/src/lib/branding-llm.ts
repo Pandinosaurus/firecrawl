@@ -109,6 +109,7 @@ export interface ButtonSnapshot {
   textColor: string;
   borderColor?: string | null;
   borderRadius?: string;
+  shadow?: string | null;
 }
 
 interface BrandingLLMInput {
@@ -437,6 +438,7 @@ export function mergeBrandingResults(
         textColor: primaryBtn.textColor,
         borderColor: primaryBtn.borderColor || undefined,
         borderRadius: primaryBtn.borderRadius || "0px",
+        shadow: primaryBtn.shadow || undefined,
       };
     }
 
@@ -451,6 +453,7 @@ export function mergeBrandingResults(
           textColor: secondaryBtn.textColor,
           borderColor: secondaryBtn.borderColor || undefined,
           borderRadius: secondaryBtn.borderRadius || "0px",
+          shadow: secondaryBtn.shadow || undefined,
         };
       }
     }

@@ -140,7 +140,7 @@ export const brandingScript = `
     };
     
     pushQ('header img, .site-logo img, img[alt*=logo i], img[src*="logo"]', 5);
-    pushQ('button, [role=button], a.button, a.btn, [class*="btn"], a[class*="bg-brand"], a[class*="bg-primary"], a[class*="bg-accent"], a[class*="-button"]', 50);
+    pushQ('button, [role=button], [data-primary-button], [data-secondary-button], [data-cta], a.button, a.btn, [class*="btn"], [class*="button"], a[class*="bg-brand"], a[class*="bg-primary"], a[class*="bg-accent"]', 50);
     pushQ('input, select, textarea, [class*="form-control"]', 25);
     pushQ("h1, h2, h3, p, a", 50);
     
@@ -182,7 +182,26 @@ export const brandingScript = `
 
     let bgColor = cs.getPropertyValue("background-color");
     const textColor = cs.getPropertyValue("color");
-    const isButton = el.matches('button,[role=button],a.button,a.btn,[class*="btn"],a[class*="bg-brand"],a[class*="bg-primary"],a[class*="bg-accent"],a[class*="-button"]');
+    
+    const isButton = el.matches('button,[role=button],[data-primary-button],[data-secondary-button],[data-cta],a.button,a.btn,[class*="btn"],[class*="button"],a[class*="bg-brand"],a[class*="bg-primary"],a[class*="bg-accent"]');
+    
+    let isNavigation = false;
+    let hasCTAIndicator = false;
+    
+    try {
+      // Check for explicit CTA indicators first
+      hasCTAIndicator = el.matches('[data-primary-button],[data-secondary-button],[data-cta],[class*="cta"],[class*="hero"]') ||
+        el.getAttribute("data-primary-button") === "true" ||
+        el.getAttribute("data-secondary-button") === "true";
+      
+      // Only mark as navigation if NOT a CTA and matches navigation patterns
+      if (!hasCTAIndicator) {
+        isNavigation = el.matches('[role="tab"],[role="menuitem"],[aria-haspopup],[class*="nav-"],[class*="-nav"],[class*="menu-"],[class*="-menu"],[class*="toggle"],[class*="trigger"]') ||
+          !!el.closest('nav, [role="navigation"], [class*="navigation"], [class*="dropdown"], [role="menu"]');
+      }
+    } catch (e) {
+      // Ignore selector errors
+    }
     
     // For buttons, if background is transparent/very transparent, check parent backgrounds
     if (isButton && bgColor) {
@@ -233,7 +252,10 @@ export const brandingScript = `
         weight: parseInt(cs.getPropertyValue("font-weight"), 10) || null,
       },
       radius: toPx(cs.getPropertyValue("border-radius")),
-      isButton: isButton,
+      shadow: cs.getPropertyValue("box-shadow") || null,
+      isButton: isButton && !isNavigation,
+      isNavigation: isNavigation,
+      hasCTAIndicator: hasCTAIndicator,
       isInput: el.matches('input,select,textarea,[class*="form-control"]'),
       isLink: el.matches("a"),
     };

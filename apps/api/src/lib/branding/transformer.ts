@@ -55,7 +55,10 @@ export async function brandingTransformer(
       { error },
     );
     brandingProfile = jsBranding;
-    delete (brandingProfile as any).__framework_hints;
+  }
+
+  if (process.env.DEBUG_BRANDING !== "true") {
+    delete (brandingProfile as any).__button_snapshots;
   }
 
   return brandingProfile;

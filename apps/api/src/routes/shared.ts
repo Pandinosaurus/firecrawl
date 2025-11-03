@@ -263,7 +263,7 @@ export function requestTimingMiddleware(version: string) {
       const requestTime = new Date().getTime() - startTime;
 
       // Only log for successful responses to avoid duplicate error logs
-      if (body?.success !== false && process.env.CI !== "true") {
+      if (body?.success !== false) {
         logger.info(`${version} request completed`, {
           version,
           path: req.path,

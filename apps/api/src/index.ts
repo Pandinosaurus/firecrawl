@@ -56,11 +56,6 @@ cacheableLookup.install(https.globalAgent);
 const expressApp = express();
 const ws = expressWs(expressApp);
 const app = ws.app;
-const publicDir = path.join(__dirname, "../public");
-
-app.get("/branding-demo", (req, res) => {
-  res.sendFile(path.join(publicDir, "branding-demo.html"));
-});
 
 global.isProduction = process.env.IS_PRODUCTION === "true";
 

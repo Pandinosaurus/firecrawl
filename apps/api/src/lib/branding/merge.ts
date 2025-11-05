@@ -104,6 +104,17 @@ export function mergeBrandingResults(
       background: llm.colorRoles.backgroundColor || merged.colors?.background,
       textPrimary: llm.colorRoles.textPrimary || merged.colors?.textPrimary,
     };
+
+    // Add LLM-selected colors to debug output
+    if ((merged as any).__debug_colors) {
+      (merged as any).__debug_colors.llmSelectedColors = {
+        primary: llm.colorRoles.primaryColor,
+        accent: llm.colorRoles.accentColor,
+        background: llm.colorRoles.backgroundColor,
+        textPrimary: llm.colorRoles.textPrimary,
+        confidence: llm.colorRoles.confidence,
+      };
+    }
   }
 
   if (llm.personality) {

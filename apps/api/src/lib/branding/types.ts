@@ -10,6 +10,10 @@ export interface ButtonSnapshot {
   borderColor?: string | null;
   borderRadius?: string;
   shadow?: string | null;
+  // Debug: original color values before conversion to hex
+  originalBackgroundColor?: string;
+  originalTextColor?: string;
+  originalBorderColor?: string;
 }
 
 export interface BrandingLLMInput {
@@ -27,10 +31,18 @@ export interface BrandingLLMInput {
       altMatch: boolean;
       srcMatch: boolean;
       classMatch: boolean;
+      hrefMatch: boolean;
     };
+    href?: string;
     source: string;
   }>;
   brandName?: string;
+  backgroundCandidates?: Array<{
+    color: string;
+    source: string;
+    priority: number;
+    area?: number;
+  }>;
   screenshot?: string;
   url: string;
 }
@@ -81,7 +93,9 @@ export interface BrandingScriptReturn {
       altMatch: boolean;
       srcMatch: boolean;
       classMatch: boolean;
+      hrefMatch: boolean;
     };
+    href?: string;
     source: string;
   }>;
   brandName?: string;
@@ -99,4 +113,11 @@ export interface BrandingScriptReturn {
   };
   frameworkHints: string[];
   colorScheme: "light" | "dark";
+  pageBackground?: string | null;
+  backgroundCandidates?: Array<{
+    color: string;
+    source: string;
+    priority: number;
+    area?: number;
+  }>;
 }

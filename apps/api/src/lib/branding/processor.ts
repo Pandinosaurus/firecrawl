@@ -15,20 +15,31 @@ function hexify(rgba: string): string | null {
       return null;
     }
 
-    let r = rgbColor.r ?? 0;
-    let g = rgbColor.g ?? 0;
-    let b = rgbColor.b ?? 0;
+    let r = Math.round((rgbColor.r ?? 0) * 255);
+    let g = Math.round((rgbColor.g ?? 0) * 255);
+    let b = Math.round((rgbColor.b ?? 0) * 255);
     const alpha = rgbColor.alpha ?? 1;
 
-    if (alpha < 1) {
-      r = r * alpha + (1 - alpha);
-      g = g * alpha + (1 - alpha);
-      b = b * alpha + (1 - alpha);
-    }
+    // Clamp values to valid range
+    r = Math.max(0, Math.min(255, r));
+    g = Math.max(0, Math.min(255, g));
+    b = Math.max(0, Math.min(255, b));
 
-    const blendedColor = { mode: "rgb" as const, r, g, b };
-    const hex = formatHex(blendedColor);
-    return hex ? hex.toUpperCase() : null;
+    // Format as hex
+    const rHex = r.toString(16).padStart(2, "0");
+    const gHex = g.toString(16).padStart(2, "0");
+    const bHex = b.toString(16).padStart(2, "0");
+
+    if (alpha < 1) {
+      // Include alpha channel in hex format (#RRGGBBAA)
+      const aHex = Math.round(alpha * 255)
+        .toString(16)
+        .padStart(2, "0");
+      return `#${rHex}${gHex}${bHex}${aHex}`.toUpperCase();
+    } else {
+      // No alpha channel (#RRGGBB)
+      return `#${rHex}${gHex}${bHex}`.toUpperCase();
+    }
   } catch (e) {
     return null;
   }
@@ -49,12 +60,22 @@ function contrastYIQ(hex: string): number {
 function inferPalette(
   snapshots: BrandingScriptReturn["snapshots"],
   cssColors: string[],
+  colorScheme?: "light" | "dark",
+  pageBackground?: string | null,
 ) {
   const freq = new Map<string, number>();
   const bump = (hex: string | null, weight = 1) => {
     if (!hex) return;
     freq.set(hex, (freq.get(hex) || 0) + weight);
   };
+
+  // Give very high weight to page background if available
+  if (pageBackground) {
+    const pageBgHex = hexify(pageBackground);
+    if (pageBgHex) {
+      bump(pageBgHex, 1000); // Much higher weight than other colors
+    }
+  }
 
   for (const s of snapshots) {
     const area = Math.max(1, s.rect.w * s.rect.h);
@@ -80,23 +101,63 @@ function inferPalette(
     return max - min < 15;
   };
 
-  const background =
-    ranked.find(h => isGrayish(h) && contrastYIQ(h) > 180) || "#FFFFFF";
+  // Improved background detection that considers color scheme
+  let background = "#FFFFFF"; // Default fallback
+
+  if (pageBackground) {
+    const pageBgHex = hexify(pageBackground);
+    if (pageBgHex && isGrayish(pageBgHex)) {
+      background = pageBgHex;
+    }
+  }
+
+  if (background === "#FFFFFF" || (!pageBackground && ranked.length > 0)) {
+    // If we don't have a good page background, infer from ranked colors
+    if (colorScheme === "dark") {
+      // For dark mode: look for dark grayish colors (low YIQ, but grayish)
+      background =
+        ranked.find(
+          h => isGrayish(h) && contrastYIQ(h) < 128 && contrastYIQ(h) > 0,
+        ) ||
+        ranked.find(h => isGrayish(h) && contrastYIQ(h) < 180) ||
+        "#1A1A1A";
+    } else {
+      // For light mode: look for light grayish colors (high YIQ and grayish)
+      background =
+        ranked.find(h => isGrayish(h) && contrastYIQ(h) > 180) || "#FFFFFF";
+    }
+  }
+
   const textPrimary =
     ranked.find(h => !/^#FFFFFF$/i.test(h) && contrastYIQ(h) < 160) ||
-    "#111111";
+    (colorScheme === "dark" ? "#FFFFFF" : "#111111");
   const primary =
     ranked.find(h => !isGrayish(h) && h !== textPrimary && h !== background) ||
-    "#000000";
+    (colorScheme === "dark" ? "#FFFFFF" : "#000000");
   const accent = ranked.find(h => h !== primary && !isGrayish(h)) || primary;
 
-  return {
+  // Collect all detected colors with their frequencies for debugging
+  const allDetectedColors = Array.from(freq.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([hex, count]) => ({
+      hex,
+      frequency: count,
+      isGrayish: isGrayish(hex),
+      yiq: contrastYIQ(hex),
+    }));
+
+  const paletteResult = {
     primary,
     accent,
     background,
     textPrimary: textPrimary,
     link: accent,
   };
+
+  // Store all detected colors for debugging (will be added to debug output)
+  (paletteResult as any).__allDetectedColors = allDetectedColors;
+
+  return paletteResult;
 }
 
 // Infer spacing base unit
@@ -158,7 +219,12 @@ function pickLogo(images: Array<{ type: string; src: string }>): string | null {
 
 // Process raw branding data into BrandingProfile
 export function processRawBranding(raw: BrandingScriptReturn): BrandingProfile {
-  const palette = inferPalette(raw.snapshots, raw.cssData.colors);
+  const palette = inferPalette(
+    raw.snapshots,
+    raw.cssData.colors,
+    raw.colorScheme,
+    raw.pageBackground,
+  );
 
   // Typography
   const typography = {
@@ -205,7 +271,8 @@ export function processRawBranding(raw: BrandingScriptReturn): BrandingProfile {
     },
   };
 
-  const buttonSnapshots = raw.snapshots
+  // Filter and score buttons
+  const candidateButtons = raw.snapshots
     .filter(s => {
       if (!s.isButton) return false;
       if (s.rect.w < 30 || s.rect.h < 30) return false;
@@ -258,31 +325,110 @@ export function processRawBranding(raw: BrandingScriptReturn): BrandingProfile {
 
       return { ...s, _score: score };
     })
-    .sort((a: any, b: any) => (b._score || 0) - (a._score || 0))
-    .slice(0, 50)
-    .map((s, idx) => {
-      let bgHex = hexify(s.colors.background);
-      const borderHex =
-        s.colors.borderWidth && s.colors.borderWidth > 0
-          ? hexify(s.colors.border)
-          : null;
+    .sort((a: any, b: any) => (b._score || 0) - (a._score || 0));
 
-      if (!bgHex) {
-        bgHex = "transparent";
-      }
+  // Deduplicate buttons: same text + background + similar classes = same button
+  const seenButtons = new Map<string, number>();
+  const uniqueButtons: typeof candidateButtons = [];
 
-      return {
-        index: idx,
-        text: s.text || "",
-        html: "",
-        classes: s.classes || "",
-        background: bgHex,
-        textColor: hexify(s.colors.text) || "#000000",
-        borderColor: borderHex,
-        borderRadius: s.radius ? `${s.radius}px` : "0px",
-        shadow: s.shadow || null,
-      };
-    });
+  for (const button of candidateButtons) {
+    const bgHex = hexify(button.colors.background) || "transparent";
+    const textKey = (button.text || "").trim().toLowerCase().substring(0, 50);
+    const classKey = (button.classes || "")
+      .split(/\s+/)
+      .slice(0, 5)
+      .join(" ")
+      .toLowerCase();
+
+    // Create a signature: text + background + first 5 classes
+    const signature = `${textKey}|${bgHex}|${classKey}`;
+
+    if (!seenButtons.has(signature)) {
+      seenButtons.set(signature, 1);
+      uniqueButtons.push(button);
+    } else {
+      // If we've seen this button, increment count but don't add it
+      seenButtons.set(signature, seenButtons.get(signature)! + 1);
+    }
+  }
+
+  // Take top unique buttons (increased limit for more diversity)
+  const topButtons = uniqueButtons.slice(0, 80);
+
+  const buttonSnapshots = topButtons.map((s, idx) => {
+    let bgHex = hexify(s.colors.background);
+    const borderHex =
+      s.colors.borderWidth && s.colors.borderWidth > 0
+        ? hexify(s.colors.border)
+        : null;
+
+    if (!bgHex) {
+      bgHex = "transparent";
+    }
+
+    return {
+      index: idx,
+      text: s.text || "",
+      html: "",
+      classes: s.classes || "",
+      background: bgHex,
+      textColor: hexify(s.colors.text) || "#000000",
+      borderColor: borderHex,
+      borderRadius: s.radius ? `${s.radius}px` : "0px",
+      shadow: s.shadow || null,
+      // Debug: original color values before hex conversion
+      originalBackgroundColor: s.colors.background || undefined,
+      originalTextColor: s.colors.text || undefined,
+      originalBorderColor: s.colors.border || undefined,
+    };
+  });
+
+  // Collect all colors from different sources for debugging
+  const debugColors = {
+    // All detected colors from snapshots and CSS (with frequency)
+    allDetectedColors: (palette as any).__allDetectedColors || [],
+
+    // Background candidates from the page
+    backgroundCandidates: raw.backgroundCandidates || [],
+
+    // Raw CSS colors from stylesheets
+    rawCssColors: raw.cssData.colors || [],
+
+    // Colors from snapshots (background, text, border)
+    snapshotColors: {
+      backgrounds: raw.snapshots
+        .map(s => ({
+          hex: hexify(s.colors.background),
+          area: s.rect.w * s.rect.h,
+          tag: s.tag,
+          classes: s.classes.substring(0, 50),
+        }))
+        .filter(c => c.hex),
+      texts: raw.snapshots
+        .map(s => ({
+          hex: hexify(s.colors.text),
+          tag: s.tag,
+          classes: s.classes.substring(0, 50),
+        }))
+        .filter(c => c.hex),
+      borders: raw.snapshots
+        .map(s => ({
+          hex: hexify(s.colors.border),
+          tag: s.tag,
+          classes: s.classes.substring(0, 50),
+        }))
+        .filter(c => c.hex),
+    },
+
+    // Inferred palette
+    inferredPalette: {
+      primary: palette.primary,
+      accent: palette.accent,
+      background: palette.background,
+      textPrimary: palette.textPrimary,
+      link: palette.link,
+    },
+  };
 
   return {
     colorScheme: raw.colorScheme,
@@ -297,5 +443,6 @@ export function processRawBranding(raw: BrandingScriptReturn): BrandingProfile {
     images,
     __button_snapshots: buttonSnapshots as any,
     __framework_hints: raw.frameworkHints as any,
+    __debug_colors: debugColors as any, // Debug: all color information
   };
 }

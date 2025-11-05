@@ -27,6 +27,7 @@ export async function brandingTransformer(
 
     const logoCandidates = rawBranding.logoCandidates || [];
     const brandName = rawBranding.brandName;
+    const backgroundCandidates = rawBranding.backgroundCandidates || [];
 
     // Optimize logo candidates: limit to top 15, prioritize by indicators
     const optimizedCandidates = logoCandidates
@@ -34,6 +35,7 @@ export async function brandingTransformer(
         // Score candidates: higher score = better
         const scoreA =
           (a.indicators.inHeader ? 10 : 0) +
+          (a.indicators.hrefMatch ? 8 : 0) + // href="/" is strong indicator
           (a.isVisible ? 5 : 0) +
           (a.indicators.altMatch ? 3 : 0) +
           (a.indicators.srcMatch ? 2 : 0) +
@@ -41,6 +43,7 @@ export async function brandingTransformer(
           (a.location === "header" ? 5 : 0);
         const scoreB =
           (b.indicators.inHeader ? 10 : 0) +
+          (b.indicators.hrefMatch ? 8 : 0) + // href="/" is strong indicator
           (b.isVisible ? 5 : 0) +
           (b.indicators.altMatch ? 3 : 0) +
           (b.indicators.srcMatch ? 2 : 0) +
@@ -60,6 +63,8 @@ export async function brandingTransformer(
       logoCandidates:
         optimizedCandidates.length > 0 ? optimizedCandidates : undefined,
       brandName,
+      backgroundCandidates:
+        backgroundCandidates.length > 0 ? backgroundCandidates : undefined,
       screenshot: document.screenshot,
       url: document.url || meta.url,
     });

@@ -1063,71 +1063,18 @@ export const getBrandingScript = () => String.raw`
   // Keep pageBackground for backward compatibility (first candidate)
   const pageBackground = backgroundCandidates.length > 0 ? backgroundCandidates[0].color : null;
 
-  // Debug flag - only enable in development/debugging scenarios
-  const DEBUG = false;
-
-  const result = {
-    cssData,
-    snapshots,
-    images: imageData.images,
-    logoCandidates: imageData.logoCandidates,
-    brandName,
-    typography,
-    frameworkHints,
-    colorScheme,
-    pageBackground,
-    backgroundCandidates,
-  };
-
-  // Only add debug info if DEBUG flag is true (not in production)
-  if (DEBUG) {
-    const colorSchemeDebug = (() => {
-      const body = document.body;
-      const html = document.documentElement;
-      const bodyBg = getComputedStyle(body).backgroundColor;
-      const htmlBg = getComputedStyle(html).backgroundColor;
-      
-      let prefersDark = false;
-      try {
-        prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      } catch (e) {}
-      
-      const hasDarkClass = html.classList.contains("dark") || body.classList.contains("dark");
-      const hasLightClass = html.classList.contains("light") || body.classList.contains("light");
-      const dataTheme = html.getAttribute("data-theme") || body.getAttribute("data-theme");
-      
-      return {
-        detected: colorScheme,
-        bodyBg,
-        htmlBg,
-        prefersColorScheme: prefersDark ? "dark" : "light",
-        hasDarkClass,
-        hasLightClass,
-        dataTheme,
-      };
-    })();
-
-    const buttonDebug = snapshots
-      .filter(s => s.isButton)
-      .slice(0, 10)
-      .map((s, idx) => ({
-        index: idx,
-        text: (s.text || "").substring(0, 50),
-        bgColor: s.colors.background,
-        textColor: s.colors.text,
-        borderColor: s.colors.border,
-        borderWidth: s.colors.borderWidth,
-        classes: s.classes,
-        rect: s.rect,
-      }));
-
-    result.debug = {
-      buttonColors: buttonDebug,
-      colorScheme: colorSchemeDebug,
-    };
-  }
-
   return {
-    branding: result,
+    branding: {
+      cssData,
+      snapshots,
+      images: imageData.images,
+      logoCandidates: imageData.logoCandidates,
+      brandName,
+      typography,
+      frameworkHints,
+      colorScheme,
+      pageBackground,
+      backgroundCandidates,
+    },
   };
 })();`;

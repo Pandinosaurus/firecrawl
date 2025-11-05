@@ -159,9 +159,6 @@ function inferPalette(
     link: accent,
   };
 
-  // Store all detected colors for debugging (will be added to debug output)
-  (paletteResult as any).__allDetectedColors = allDetectedColors;
-
   return paletteResult;
 }
 
@@ -412,53 +409,6 @@ export function processRawBranding(raw: BrandingScriptReturn): BrandingProfile {
     };
   });
 
-  // Collect all colors from different sources for debugging
-  const debugColors = {
-    // All detected colors from snapshots and CSS (with frequency)
-    allDetectedColors: (palette as any).__allDetectedColors || [],
-
-    // Background candidates from the page
-    backgroundCandidates: raw.backgroundCandidates || [],
-
-    // Raw CSS colors from stylesheets
-    rawCssColors: raw.cssData.colors || [],
-
-    // Colors from snapshots (background, text, border)
-    snapshotColors: {
-      backgrounds: raw.snapshots
-        .map(s => ({
-          hex: hexify(s.colors.background),
-          area: s.rect.w * s.rect.h,
-          tag: s.tag,
-          classes: s.classes.substring(0, 50),
-        }))
-        .filter(c => c.hex),
-      texts: raw.snapshots
-        .map(s => ({
-          hex: hexify(s.colors.text),
-          tag: s.tag,
-          classes: s.classes.substring(0, 50),
-        }))
-        .filter(c => c.hex),
-      borders: raw.snapshots
-        .map(s => ({
-          hex: hexify(s.colors.border),
-          tag: s.tag,
-          classes: s.classes.substring(0, 50),
-        }))
-        .filter(c => c.hex),
-    },
-
-    // Inferred palette
-    inferredPalette: {
-      primary: palette.primary,
-      accent: palette.accent,
-      background: palette.background,
-      textPrimary: palette.textPrimary,
-      link: palette.link,
-    },
-  };
-
   return {
     colorScheme: raw.colorScheme,
     fonts: fontsList,
@@ -472,6 +422,5 @@ export function processRawBranding(raw: BrandingScriptReturn): BrandingProfile {
     images,
     __button_snapshots: buttonSnapshots as any,
     __framework_hints: raw.frameworkHints as any,
-    __debug_colors: debugColors as any, // Debug: all color information
   };
 }

@@ -15,7 +15,22 @@ export interface ButtonSnapshot {
 export interface BrandingLLMInput {
   jsAnalysis: BrandingProfile;
   buttons: ButtonSnapshot[];
-
+  logoCandidates?: Array<{
+    src: string;
+    alt: string;
+    isSvg: boolean;
+    isVisible: boolean;
+    location: "header" | "body";
+    position: { top: number; left: number; width: number; height: number };
+    indicators: {
+      inHeader: boolean;
+      altMatch: boolean;
+      srcMatch: boolean;
+      classMatch: boolean;
+    };
+    source: string;
+  }>;
+  brandName?: string;
   screenshot?: string;
   url: string;
 }
@@ -54,6 +69,22 @@ export interface BrandingScriptReturn {
     isLink: boolean;
   }>;
   images: Array<{ type: string; src: string }>;
+  logoCandidates?: Array<{
+    src: string;
+    alt: string;
+    isSvg: boolean;
+    isVisible: boolean;
+    location: "header" | "body";
+    position: { top: number; left: number; width: number; height: number };
+    indicators: {
+      inHeader: boolean;
+      altMatch: boolean;
+      srcMatch: boolean;
+      classMatch: boolean;
+    };
+    source: string;
+  }>;
+  brandName?: string;
   typography: {
     stacks: {
       body: string[];

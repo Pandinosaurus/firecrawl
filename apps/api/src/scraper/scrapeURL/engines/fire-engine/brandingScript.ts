@@ -307,6 +307,7 @@ export const getBrandingScript = () => String.raw`
 
   const findImages = () => {
     const imgs = [];
+    const logoCandidates = [];
     const push = (src, type) => {
       if (src) imgs.push({ type, src });
     };
@@ -318,142 +319,126 @@ export const getBrandingScript = () => String.raw`
       "twitter",
     );
 
-    // Try to find logo in header/nav/navbar first, or in elements with logo-related classes
-    const headerLinkImgCandidates = Array.from(document.querySelectorAll(
-      'header a img, header a svg, nav a img, nav a svg, [role="banner"] a img, [role="banner"] a svg, .header a img, .header a svg, #navbar a img, #navbar a svg, [id*="navbar"] a img, [id*="navbar"] a svg, [class*="navbar"] a img, [class*="navbar"] a svg, a[class*="logo"] img, a[class*="logo"] svg, img[class*="nav-logo"], svg[class*="nav-logo"], img[class*="logo"], svg[class*="logo"]',
-    )).filter(el => {
-      // Filter out hidden elements (common in dark/light mode setups)
+    // Helper to collect logo candidate metadata
+    const collectLogoCandidate = (el, source) => {
       const rect = el.getBoundingClientRect();
       const style = getComputedStyle(el);
-      return (
+      const isVisible = (
         rect.width > 0 &&
         rect.height > 0 &&
         style.display !== "none" &&
         style.visibility !== "hidden" &&
         style.opacity !== "0"
       );
+
+      const inHeader = el.closest('header, nav, [role="banner"], #navbar, [id*="navbar"], [class*="navbar"]');
+      const alt = el.alt || "";
+      const srcMatch = el.src ? /logo/i.test(el.src) : false;
+      const altMatch = /logo/i.test(alt);
+      const classMatch = el.className && /logo/i.test(el.className);
+      
+      let src = "";
+      let isSvg = false;
+      
+      if (el.tagName.toLowerCase() === "svg") {
+        const resolvedSvg = resolveSvgStyles(el);
+        const serializer = new XMLSerializer();
+        src = "data:image/svg+xml;utf8," + encodeURIComponent(serializer.serializeToString(resolvedSvg));
+        isSvg = true;
+      } else {
+        src = el.src || "";
+      }
+
+      if (src) {
+        logoCandidates.push({
+          src,
+          alt,
+          isSvg,
+          isVisible,
+          location: inHeader ? "header" : "body",
+          position: { top: rect.top, left: rect.left, width: rect.width, height: rect.height },
+          indicators: {
+            inHeader: !!inHeader,
+            altMatch,
+            srcMatch,
+            classMatch,
+          },
+          source,
+        });
+      }
+    };
+
+    // Collect all potential logo candidates (including hidden ones for LLM to decide)
+    const allLogoSelectors = [
+      'header a img, header a svg',
+      'nav a img, nav a svg',
+      '[role="banner"] a img, [role="banner"] a svg',
+      '#navbar a img, #navbar a svg',
+      '[id*="navbar"] a img, [id*="navbar"] a svg',
+      '[class*="navbar"] a img, [class*="navbar"] a svg',
+      'a[class*="logo"] img, a[class*="logo"] svg',
+      'img[class*="nav-logo"], svg[class*="nav-logo"]',
+      'img[class*="logo"], svg[class*="logo"]',
+    ];
+
+    allLogoSelectors.forEach(selector => {
+      Array.from(document.querySelectorAll(selector)).forEach(el => {
+        collectLogoCandidate(el, selector);
+      });
     });
 
-    // Prefer images in header/nav/navbar, then by position
-    const headerLinkImg = headerLinkImgCandidates.reduce((best, el) => {
-      if (!best) return el;
-      const elInHeader = el.closest('header, nav, [role="banner"], #navbar, [id*="navbar"], [class*="navbar"]');
-      const bestInHeader = best.closest('header, nav, [role="banner"], #navbar, [id*="navbar"], [class*="navbar"]');
-      if (elInHeader && !bestInHeader) return el;
-      if (!elInHeader && bestInHeader) return best;
-      const elRect = el.getBoundingClientRect();
-      const bestRect = best.getBoundingClientRect();
-      return elRect.top < bestRect.top ? el : best;
-    }, null);
-
-    if (headerLinkImg) {
-      if (headerLinkImg.tagName.toLowerCase() === "svg") {
-        const resolvedSvg = resolveSvgStyles(headerLinkImg);
-        const serializer = new XMLSerializer();
-        const svgStr =
-          "data:image/svg+xml;utf8," +
-          encodeURIComponent(serializer.serializeToString(resolvedSvg));
-        push(svgStr, "logo-svg");
-      } else {
-        push(headerLinkImg.src, "logo");
+    // Also collect from document.images and SVGs
+    Array.from(document.images).forEach(img => {
+      if (
+        /logo/i.test(img.alt || "") ||
+        /logo/i.test(img.src) ||
+        img.closest('[class*="logo"]')
+      ) {
+        if (!img.closest('[class*="testimonial"], [class*="client"], [class*="partner"]')) {
+          collectLogoCandidate(img, "document.images");
+        }
       }
-    } else {
-      const logoImgCandidates = Array.from(document.images)
-        .filter(
-          img =>
-            /logo/i.test(img.alt || "") ||
-            /logo/i.test(img.src) ||
-            img.closest('[class*="logo"]'),
-        )
-        .filter(
-          img =>
-            !img.closest(
-              '[class*="testimonial"], [class*="client"], [class*="partner"]',
-            ),
-        )
-        // Filter out hidden images (common in dark/light mode setups)
-        .filter(img => {
-          const rect = img.getBoundingClientRect();
-          const style = getComputedStyle(img);
-          return (
-            rect.width > 0 &&
-            rect.height > 0 &&
-            style.display !== "none" &&
-            style.visibility !== "hidden" &&
-            style.opacity !== "0"
-          );
-        });
+    });
 
-      const logoImg = logoImgCandidates.reduce((best, img) => {
-        if (!best) return img;
-        const imgInHeader = img.closest('header, nav, [role="banner"], #navbar, [id*="navbar"], [class*="navbar"]');
-        const bestInHeader = best.closest('header, nav, [role="banner"], #navbar, [id*="navbar"], [class*="navbar"]');
-        if (imgInHeader && !bestInHeader) return img;
-        if (!imgInHeader && bestInHeader) return best;
-        const imgRect = img.getBoundingClientRect();
-        const bestRect = best.getBoundingClientRect();
-        // Prefer images with larger dimensions if at similar vertical positions
-        if (Math.abs(imgRect.top - bestRect.top) < 10) {
-          const imgArea = imgRect.width * imgRect.height;
-          const bestArea = bestRect.width * bestRect.height;
-          return imgArea > bestArea ? img : best;
+    Array.from(document.querySelectorAll("svg")).forEach(svg => {
+      if (
+        /logo/i.test(svg.id) ||
+        /logo/i.test(svg.className?.baseVal || "")
+      ) {
+        if (!svg.closest('[class*="testimonial"], [class*="client"], [class*="partner"]')) {
+          collectLogoCandidate(svg, "document.querySelectorAll(svg)");
         }
-        return imgRect.top < bestRect.top ? img : best;
+      }
+    });
+
+    // Remove duplicates (same src)
+    const seen = new Set();
+    const uniqueCandidates = logoCandidates.filter(candidate => {
+      if (seen.has(candidate.src)) return false;
+      seen.add(candidate.src);
+      return true;
+    });
+
+    // For backward compatibility, still pick one logo using the old logic
+    const visibleCandidates = uniqueCandidates.filter(c => c.isVisible);
+    if (visibleCandidates.length > 0) {
+      const best = visibleCandidates.reduce((best, candidate) => {
+        if (!best) return candidate;
+        if (candidate.indicators.inHeader && !best.indicators.inHeader) return candidate;
+        if (!candidate.indicators.inHeader && best.indicators.inHeader) return best;
+        return candidate.position.top < best.position.top ? candidate : best;
       }, null);
 
-      if (logoImg) push(logoImg.src, "logo");
-
-      const svgLogoCandidates = Array.from(document.querySelectorAll("svg"))
-        .filter(
-          s => /logo/i.test(s.id) || /logo/i.test(s.className?.baseVal || ""),
-        )
-        .filter(
-          svg =>
-            !svg.closest(
-              '[class*="testimonial"], [class*="client"], [class*="partner"]',
-            ),
-        )
-        // Filter out hidden SVGs
-        .filter(svg => {
-          const rect = svg.getBoundingClientRect();
-          const style = getComputedStyle(svg);
-          return (
-            rect.width > 0 &&
-            rect.height > 0 &&
-            style.display !== "none" &&
-            style.visibility !== "hidden" &&
-            style.opacity !== "0"
-          );
-        });
-
-      const svgLogo = svgLogoCandidates.reduce((best, svg) => {
-        if (!best) return svg;
-        const svgInHeader = svg.closest('header, nav, [role="banner"], #navbar, [id*="navbar"], [class*="navbar"]');
-        const bestInHeader = best.closest('header, nav, [role="banner"], #navbar, [id*="navbar"], [class*="navbar"]');
-        if (svgInHeader && !bestInHeader) return svg;
-        if (!svgInHeader && bestInHeader) return best;
-        const svgRect = svg.getBoundingClientRect();
-        const bestRect = best.getBoundingClientRect();
-        // Prefer SVGs with larger dimensions if at similar vertical positions
-        if (Math.abs(svgRect.top - bestRect.top) < 10) {
-          const svgArea = svgRect.width * svgRect.height;
-          const bestArea = bestRect.width * bestRect.height;
-          return svgArea > bestArea ? svg : best;
+      if (best) {
+        if (best.isSvg) {
+          push(best.src, "logo-svg");
+        } else {
+          push(best.src, "logo");
         }
-        return svgRect.top < bestRect.top ? svg : best;
-      }, null);
-
-      if (svgLogo) {
-        const resolvedSvg = resolveSvgStyles(svgLogo);
-        const serializer = new XMLSerializer();
-        const svgStr =
-          "data:image/svg+xml;utf8," +
-          encodeURIComponent(serializer.serializeToString(resolvedSvg));
-        push(svgStr, "logo-svg");
       }
     }
 
-    return imgs;
+    return { images: imgs, logoCandidates: uniqueCandidates };
   };
 
   const getTypography = () => {
@@ -539,13 +524,43 @@ export const getBrandingScript = () => String.raw`
     return "light";
   };
 
+  const extractBrandName = () => {
+    // Try multiple sources for brand name
+    const ogSiteName = document.querySelector('meta[property="og:site_name"]')?.getAttribute("content");
+    const title = document.title;
+    const h1 = document.querySelector("h1")?.textContent?.trim();
+    
+    // Extract domain name as fallback
+    let domainName = "";
+    try {
+      const hostname = window.location.hostname;
+      domainName = hostname.replace(/^www\./, "").split(".")[0];
+      // Capitalize first letter
+      domainName = domainName.charAt(0).toUpperCase() + domainName.slice(1);
+    } catch (e) {}
+
+    // Try to extract brand from title (e.g., "Firecrawl - Documentation" -> "Firecrawl")
+    let titleBrand = "";
+    if (title) {
+      // Remove common suffixes
+      titleBrand = title
+        .replace(/\s*[-|–|—]\s*.*$/, "") // Remove after dash
+        .replace(/\s*:\s*.*$/, "") // Remove after colon
+        .replace(/\s*\|.*$/, "") // Remove after pipe
+        .trim();
+    }
+
+    return ogSiteName || titleBrand || h1 || domainName || "";
+  };
+
   const cssData = collectCSSData();
   const elements = sampleElements();
   const snapshots = elements.map(getStyleSnapshot);
-  const images = findImages();
+  const imageData = findImages();
   const typography = getTypography();
   const frameworkHints = detectFrameworkHints();
   const colorScheme = detectColorScheme();
+  const brandName = extractBrandName();
 
   const buttonDebug = snapshots
     .filter(s => s.isButton)
@@ -563,7 +578,9 @@ export const getBrandingScript = () => String.raw`
     branding: {
       cssData,
       snapshots,
-      images,
+      images: imageData.images,
+      logoCandidates: imageData.logoCandidates,
+      brandName,
       typography,
       frameworkHints,
       colorScheme,

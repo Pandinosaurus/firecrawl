@@ -25,13 +25,18 @@ export async function brandingTransformer(
     const buttonSnapshots: ButtonSnapshot[] =
       (jsBranding as any).__button_snapshots || [];
 
+    const logoCandidates = rawBranding.logoCandidates || [];
+    const brandName = rawBranding.brandName;
+
     meta.logger.info(
-      `Sending ${buttonSnapshots.length} buttons to LLM for classification`,
+      `Sending ${buttonSnapshots.length} buttons and ${logoCandidates.length} logo candidates to LLM for classification`,
     );
 
     const llmEnhancement = await enhanceBrandingWithLLM({
       jsAnalysis: jsBranding,
       buttons: buttonSnapshots,
+      logoCandidates: logoCandidates.length > 0 ? logoCandidates : undefined,
+      brandName,
       screenshot: document.screenshot,
       url: document.url || meta.url,
     });
@@ -42,12 +47,15 @@ export async function brandingTransformer(
         llmEnhancement.buttonClassification.secondaryButtonIndex,
       button_confidence: llmEnhancement.buttonClassification.confidence,
       color_confidence: llmEnhancement.colorRoles.confidence,
+      logo_selected_index: llmEnhancement.logoSelection?.selectedLogoIndex,
+      logo_confidence: llmEnhancement.logoSelection?.confidence,
     });
 
     brandingProfile = mergeBrandingResults(
       jsBranding,
       llmEnhancement,
       buttonSnapshots,
+      logoCandidates.length > 0 ? logoCandidates : undefined,
     );
   } catch (error) {
     meta.logger.error(

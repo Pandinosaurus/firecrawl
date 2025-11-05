@@ -6,8 +6,43 @@ export function mergeBrandingResults(
   js: BrandingProfile,
   llm: BrandingEnhancement,
   buttonSnapshots: ButtonSnapshot[],
+  logoCandidates?: Array<{
+    src: string;
+    alt: string;
+    isSvg: boolean;
+    isVisible: boolean;
+    location: "header" | "body";
+    position: { top: number; left: number; width: number; height: number };
+    indicators: {
+      inHeader: boolean;
+      altMatch: boolean;
+      srcMatch: boolean;
+      classMatch: boolean;
+    };
+    source: string;
+  }>,
 ): BrandingProfile {
   const merged: BrandingProfile = { ...js };
+
+  // Use LLM-selected logo if available
+  if (
+    llm.logoSelection &&
+    llm.logoSelection.selectedLogoIndex !== undefined &&
+    llm.logoSelection.selectedLogoIndex >= 0 &&
+    logoCandidates &&
+    logoCandidates.length > 0 &&
+    llm.logoSelection.selectedLogoIndex < logoCandidates.length
+  ) {
+    const selectedLogo = logoCandidates[llm.logoSelection.selectedLogoIndex];
+    if (selectedLogo && merged.images) {
+      merged.images.logo = selectedLogo.src;
+      (merged as any).__llm_logo_reasoning = {
+        selectedIndex: llm.logoSelection.selectedLogoIndex,
+        reasoning: llm.logoSelection.selectedLogoReasoning,
+        confidence: llm.logoSelection.confidence,
+      };
+    }
+  }
 
   if (buttonSnapshots.length > 0) {
     const primaryIdx = llm.buttonClassification.primaryButtonIndex;

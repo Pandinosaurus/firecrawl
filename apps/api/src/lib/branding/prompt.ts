@@ -183,41 +183,31 @@ export function buildBrandingPrompt(input: BrandingLLMInput): string {
     });
   }
 
-  // Add logo candidates section
+  // Add logo candidates section (optimized - compact format)
   if (logoCandidates && logoCandidates.length > 0) {
-    prompt += `\n## Logo Candidates (${logoCandidates.length} found):\n`;
+    prompt += `\n## Logo Candidates (${logoCandidates.length}):\n`;
 
     if (brandName) {
-      prompt += `**Brand Name**: ${brandName}\n`;
-      prompt += `Use this brand name to help identify which logo matches the brand. Look for logos that visually represent "${brandName}" or contain text/images related to it.\n\n`;
+      prompt += `Brand: "${brandName}" - Use this to match logos visually.\n\n`;
     }
 
-    prompt += `The following logo candidates were detected on the page. Analyze them along with the screenshot to identify the best brand logo:\n\n`;
-
+    // Compact format: index, location, visible, alt, indicators, truncated URL
     logoCandidates.forEach((candidate, idx) => {
-      prompt += `**Logo Candidate #${idx}:**\n`;
-      prompt += `- Source: ${candidate.source}\n`;
-      prompt += `- Location: ${candidate.location}\n`;
-      prompt += `- Alt text: "${candidate.alt || "none"}"\n`;
-      prompt += `- Type: ${candidate.isSvg ? "SVG" : "Image (PNG/JPG/etc)"}\n`;
-      prompt += `- Visible: ${candidate.isVisible ? "Yes" : "No (hidden - may be dark/light mode variant)"}\n`;
-      prompt += `- Position: Top ${Math.round(candidate.position.top)}px, Left ${Math.round(candidate.position.left)}px, Size ${Math.round(candidate.position.width)}x${Math.round(candidate.position.height)}px\n`;
-      prompt += `- Indicators:\n`;
-      prompt += `  * In header/navbar: ${candidate.indicators.inHeader ? "Yes" : "No"}\n`;
-      prompt += `  * Alt text contains "logo": ${candidate.indicators.altMatch ? "Yes" : "No"}\n`;
-      prompt += `  * URL contains "logo": ${candidate.indicators.srcMatch ? "Yes" : "No"}\n`;
-      prompt += `  * Class contains "logo": ${candidate.indicators.classMatch ? "Yes" : "No"}\n`;
-      prompt += `- URL/Source: ${candidate.src.substring(0, 200)}${candidate.src.length > 200 ? "..." : ""}\n\n`;
+      const indicators = [];
+      if (candidate.indicators.inHeader) indicators.push("header");
+      if (candidate.indicators.altMatch) indicators.push("alt=logo");
+      if (candidate.indicators.srcMatch) indicators.push("url=logo");
+      if (candidate.indicators.classMatch) indicators.push("class=logo");
+
+      const urlPreview =
+        candidate.src.length > 80
+          ? candidate.src.substring(0, 80) + "..."
+          : candidate.src;
+
+      prompt += `#${idx}: ${candidate.location} | ${candidate.isVisible ? "visible" : "hidden"} | ${candidate.isSvg ? "SVG" : "IMG"} | alt:"${candidate.alt || ""}" | [${indicators.join(", ")}] | ${urlPreview}\n`;
     });
 
-    prompt += `**LOGO SELECTION GUIDELINES:**\n`;
-    prompt += `1. **Prefer visible logos** - If a logo is hidden (isVisible: false), it's likely a dark/light mode variant. Prefer the visible one that matches the current theme.\n`;
-    prompt += `2. **Header location is preferred** - Logos in header/navbar are almost always the main brand logo.\n`;
-    prompt += `3. **Brand name matching** - If a brand name is provided, prefer logos that visually represent or relate to that brand.\n`;
-    prompt += `4. **Avoid partner/client logos** - Skip logos that are clearly for partners, clients, or testimonials.\n`;
-    prompt += `5. **Size matters** - Prefer logos that are appropriately sized for a header (not too small, not too large).\n`;
-    prompt += `6. **Avoid GitHub/social icons** - If you see GitHub stars, social media icons, or other non-brand elements, skip them.\n`;
-    prompt += `7. **Use the screenshot** - Look at the screenshot to visually identify which logo is actually the main brand logo at the top of the page.\n\n`;
+    prompt += `\n**Selection Rules:** Use screenshot + brand name "${brandName || "unknown"}" to pick the MAIN brand logo. Prefer: visible, in header, matches brand name. Avoid: GitHub/social icons, partners, testimonials.\n\n`;
   }
 
   // Add specific questions

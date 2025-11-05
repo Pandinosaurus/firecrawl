@@ -20,6 +20,11 @@ function hexify(rgba: string): string | null {
     let b = Math.round((rgbColor.b ?? 0) * 255);
     const alpha = rgbColor.alpha ?? 1;
 
+    // Treat fully transparent colors as absent (not as black)
+    if (alpha < 0.01) {
+      return null;
+    }
+
     // Clamp values to valid range
     r = Math.max(0, Math.min(255, r));
     g = Math.max(0, Math.min(255, g));
@@ -278,8 +283,16 @@ export function processRawBranding(raw: BrandingScriptReturn): BrandingProfile {
       if (s.rect.w < 30 || s.rect.h < 30) return false;
       if (!s.text || s.text.trim().length === 0) return false;
 
+      // Include buttons with valid background OR buttons with borders (transparent bg + border is valid)
       const bgHex = hexify(s.colors.background);
-      if (!bgHex) return false;
+
+      // Check for borders: has borderWidth > 0 AND border color is not transparent
+      const hasBorder = s.colors.borderWidth && s.colors.borderWidth > 0;
+      const borderHex = hasBorder ? hexify(s.colors.border) : null;
+
+      // Include if has background OR has border (transparent buttons with borders are valid)
+      // Note: borderHex might be null if border is transparent, but we still check hasBorder
+      if (!bgHex && !hasBorder) return false;
 
       return true;
     })
@@ -309,6 +322,12 @@ export function processRawBranding(raw: BrandingScriptReturn): BrandingProfile {
       if (ctaKeywords.some(kw => text.includes(kw))) score += 500;
 
       const bgHex = hexify(s.colors.background);
+      const borderHex =
+        s.colors.borderWidth && s.colors.borderWidth > 0
+          ? hexify(s.colors.border)
+          : null;
+
+      // Score for non-white backgrounds
       if (
         bgHex &&
         bgHex !== "#FFFFFF" &&
@@ -316,6 +335,11 @@ export function processRawBranding(raw: BrandingScriptReturn): BrandingProfile {
         bgHex !== "#F5F5F5"
       ) {
         score += 300;
+      }
+
+      // Score for buttons with borders (transparent bg + border is a valid style)
+      if (borderHex && !bgHex) {
+        score += 200; // Less than colored background but still valid
       }
 
       if (text.length > 0 && text.length < 50) score += 100;
@@ -327,12 +351,16 @@ export function processRawBranding(raw: BrandingScriptReturn): BrandingProfile {
     })
     .sort((a: any, b: any) => (b._score || 0) - (a._score || 0));
 
-  // Deduplicate buttons: same text + background + similar classes = same button
+  // Deduplicate buttons: same text + background + border + similar classes = same button
   const seenButtons = new Map<string, number>();
   const uniqueButtons: typeof candidateButtons = [];
 
   for (const button of candidateButtons) {
     const bgHex = hexify(button.colors.background) || "transparent";
+    const borderHex =
+      button.colors.borderWidth && button.colors.borderWidth > 0
+        ? hexify(button.colors.border) || "transparent-border"
+        : "no-border";
     const textKey = (button.text || "").trim().toLowerCase().substring(0, 50);
     const classKey = (button.classes || "")
       .split(/\s+/)
@@ -340,8 +368,9 @@ export function processRawBranding(raw: BrandingScriptReturn): BrandingProfile {
       .join(" ")
       .toLowerCase();
 
-    // Create a signature: text + background + first 5 classes
-    const signature = `${textKey}|${bgHex}|${classKey}`;
+    // Create a signature: text + background + border + first 5 classes
+    // Include border to distinguish buttons with same background but different borders
+    const signature = `${textKey}|${bgHex}|${borderHex}|${classKey}`;
 
     if (!seenButtons.has(signature)) {
       seenButtons.set(signature, 1);

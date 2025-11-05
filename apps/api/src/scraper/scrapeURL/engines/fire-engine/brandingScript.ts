@@ -157,6 +157,67 @@ export const getBrandingScript = () => String.raw`
     return data;
   };
 
+  // Helper to check if an element looks like a button (has button-like styling)
+  const looksLikeButton = (el) => {
+    if (!el || typeof el.matches !== 'function') return false;
+    
+    // Check explicit button indicators
+    if (el.matches('button, [role=button], [data-primary-button], [data-secondary-button], [data-cta], a.button, a.btn, [class*="btn"], [class*="button"], a[class*="bg-brand"], a[class*="bg-primary"], a[class*="bg-accent"], a[type="button"]')) {
+      return true;
+    }
+    
+    // For links, check if they have button-like styling
+    if (el.tagName.toLowerCase() === 'a') {
+      try {
+        const classes = (el.className || '').toLowerCase();
+        const classStr = classes;
+        
+        // Check for common button class patterns (Tailwind, Bootstrap, etc.)
+        const hasButtonClasses = 
+          /rounded(-md|-lg|-xl|-full)?/.test(classStr) || // rounded corners
+          /px-\d+/.test(classStr) || // horizontal padding (px-2, px-4, etc.)
+          /py-\d+/.test(classStr) || // vertical padding (py-2, py-4, etc.)
+          /p-\d+/.test(classStr) || // padding (p-2, p-4, etc.)
+          (/border/.test(classStr) && /rounded/.test(classStr)) || // border + rounded
+          (/inline-flex/.test(classStr) && /items-center/.test(classStr) && /justify-center/.test(classStr)); // flexbox button pattern
+        
+        if (hasButtonClasses) {
+          const cs = getComputedStyle(el);
+          const rect = el.getBoundingClientRect();
+          
+          // Verify it has reasonable button dimensions
+          if (rect.width > 50 && rect.height > 25) {
+            return true;
+          }
+        }
+        
+        // Also check computed styles for button-like appearance
+        const cs = getComputedStyle(el);
+        const rect = el.getBoundingClientRect();
+        
+        // Check for button-like padding and dimensions
+        const paddingTop = parseFloat(cs.paddingTop) || 0;
+        const paddingBottom = parseFloat(cs.paddingBottom) || 0;
+        const paddingLeft = parseFloat(cs.paddingLeft) || 0;
+        const paddingRight = parseFloat(cs.paddingRight) || 0;
+        const hasPadding = paddingTop > 3 || paddingBottom > 3 || paddingLeft > 6 || paddingRight > 6;
+        const hasMinSize = rect.width > 50 && rect.height > 25;
+        const hasRounded = parseFloat(cs.borderRadius) > 0;
+        const hasBorder = parseFloat(cs.borderTopWidth) > 0 || parseFloat(cs.borderBottomWidth) > 0 ||
+                         parseFloat(cs.borderLeftWidth) > 0 || parseFloat(cs.borderRightWidth) > 0;
+        
+        // Button-like if has padding + (rounded or border) and reasonable size
+        if (hasPadding && hasMinSize && (hasRounded || hasBorder)) {
+          return true;
+        }
+      } catch (e) {
+        // If we can't check styles, fall back to class matching
+      }
+    }
+    
+    return false;
+  };
+
   const sampleElements = () => {
     const picks = [];
     const pushQ = (q, limit = 10) => {
@@ -165,10 +226,21 @@ export const getBrandingScript = () => String.raw`
     };
 
     pushQ('header img, .site-logo img, img[alt*=logo i], img[src*="logo"]', 5);
+    
+    // First, get explicit buttons
     pushQ(
       'button, [role=button], [data-primary-button], [data-secondary-button], [data-cta], a.button, a.btn, [class*="btn"], [class*="button"], a[class*="bg-brand"], a[class*="bg-primary"], a[class*="bg-accent"], a[type="button"], a[type="button"][class*="bg-"]',
       100,
     );
+    
+    // Also check all links for button-like styling
+    const allLinks = Array.from(document.querySelectorAll('a'));
+    for (const link of allLinks.slice(0, 100)) {
+      if (looksLikeButton(link)) {
+        picks.push(link);
+      }
+    }
+    
     pushQ('input, select, textarea, [class*="form-control"]', 25);
     pushQ("h1, h2, h3, p, a", 50);
 
@@ -209,13 +281,75 @@ export const getBrandingScript = () => String.raw`
       }
     }
 
-    // Get colors as-is from computed style, no processing
-    const bgColor = cs.getPropertyValue("background-color");
+    // Get colors as-is from computed style
+    let bgColor = cs.getPropertyValue("background-color");
     const textColor = cs.getPropertyValue("color");
+    
+    // For transparent backgrounds, try to get the background from parent container
+    const isTransparent = bgColor === "transparent" || bgColor === "rgba(0, 0, 0, 0)";
+    const alphaMatch = bgColor.match(/rgba?\([^,]*,[^,]*,[^,]*,\s*([\d.]+)\)/);
+    const hasZeroAlpha = alphaMatch && parseFloat(alphaMatch[1]) === 0;
+    
+    if (isTransparent || hasZeroAlpha) {
+      // Walk up the DOM to find a non-transparent background
+      let parent = el.parentElement;
+      let depth = 0;
+      while (parent && depth < 5) {
+        const parentBg = getComputedStyle(parent).getPropertyValue("background-color");
+        if (parentBg && parentBg !== "transparent" && parentBg !== "rgba(0, 0, 0, 0)") {
+          const parentAlphaMatch = parentBg.match(/rgba?\([^,]*,[^,]*,[^,]*,\s*([\d.]+)\)/);
+          const parentAlpha = parentAlphaMatch ? parseFloat(parentAlphaMatch[1]) : 1;
+          if (parentAlpha > 0.1) {
+            bgColor = parentBg;
+            break;
+          }
+        }
+        parent = parent.parentElement;
+        depth++;
+      }
+    }
 
-    const isButton = el.matches(
-      'button,[role=button],[data-primary-button],[data-secondary-button],[data-cta],a.button,a.btn,[class*="btn"],[class*="button"],a[class*="bg-brand"],a[class*="bg-primary"],a[class*="bg-accent"],a[type="button"],a[type="button"][class*="bg-"]',
-    );
+    // Check if element is a button - use same logic as sampleElements
+    let isButton = false;
+    if (el.matches('button,[role=button],[data-primary-button],[data-secondary-button],[data-cta],a.button,a.btn,[class*="btn"],[class*="button"],a[class*="bg-brand"],a[class*="bg-primary"],a[class*="bg-accent"],a[type="button"],a[type="button"][class*="bg-"]')) {
+      isButton = true;
+    } else if (el.tagName.toLowerCase() === 'a') {
+      // Check if link looks like a button (has button-like styling)
+      try {
+        const classes = classNames;
+        
+        // Check for common button class patterns (Tailwind, Bootstrap, etc.)
+        const hasButtonClasses = 
+          /rounded(-md|-lg|-xl|-full)?/.test(classes) || // rounded corners
+          /px-\d+/.test(classes) || // horizontal padding (px-2, px-4, etc.)
+          /py-\d+/.test(classes) || // vertical padding (py-2, py-4, etc.)
+          /p-\d+/.test(classes) || // padding (p-2, p-4, etc.)
+          (/border/.test(classes) && /rounded/.test(classes)) || // border + rounded
+          (/inline-flex/.test(classes) && /items-center/.test(classes) && /justify-center/.test(classes)); // flexbox button pattern
+        
+        if (hasButtonClasses && rect.width > 50 && rect.height > 25) {
+          isButton = true;
+        } else {
+          // Also check computed styles for button-like appearance
+          const paddingTop = parseFloat(cs.paddingTop) || 0;
+          const paddingBottom = parseFloat(cs.paddingBottom) || 0;
+          const paddingLeft = parseFloat(cs.paddingLeft) || 0;
+          const paddingRight = parseFloat(cs.paddingRight) || 0;
+          const hasPadding = paddingTop > 3 || paddingBottom > 3 || paddingLeft > 6 || paddingRight > 6;
+          const hasMinSize = rect.width > 50 && rect.height > 25;
+          const hasRounded = parseFloat(cs.borderRadius) > 0;
+          const hasBorder = parseFloat(cs.borderTopWidth) > 0 || parseFloat(cs.borderBottomWidth) > 0 ||
+                           parseFloat(cs.borderLeftWidth) > 0 || parseFloat(cs.borderRightWidth) > 0;
+          
+          // Button-like if has padding + (rounded or border) and reasonable size
+          if (hasPadding && hasMinSize && (hasRounded || hasBorder)) {
+            isButton = true;
+          }
+        }
+      } catch (e) {
+        // If we can't check styles, not a button
+      }
+    }
 
     let isNavigation = false;
     let hasCTAIndicator = false;
@@ -929,61 +1063,71 @@ export const getBrandingScript = () => String.raw`
   // Keep pageBackground for backward compatibility (first candidate)
   const pageBackground = backgroundCandidates.length > 0 ? backgroundCandidates[0].color : null;
 
-  // Debug: collect color scheme detection info
-  const colorSchemeDebug = (() => {
-    const body = document.body;
-    const html = document.documentElement;
-    const bodyBg = getComputedStyle(body).backgroundColor;
-    const htmlBg = getComputedStyle(html).backgroundColor;
-    
-    let prefersDark = false;
-    try {
-      prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-    } catch (e) {}
-    
-    const hasDarkClass = html.classList.contains("dark") || body.classList.contains("dark");
-    const hasLightClass = html.classList.contains("light") || body.classList.contains("light");
-    const dataTheme = html.getAttribute("data-theme") || body.getAttribute("data-theme");
-    
-    return {
-      detected: colorScheme,
-      bodyBg,
-      htmlBg,
-      prefersColorScheme: prefersDark ? "dark" : "light",
-      hasDarkClass,
-      hasLightClass,
-      dataTheme,
-    };
-  })();
+  // Debug flag - only enable in development/debugging scenarios
+  const DEBUG = false;
 
-  const buttonDebug = snapshots
-    .filter(s => s.isButton)
-    .slice(0, 10)
-    .map((s, idx) => ({
-      index: idx,
-      text: (s.text || "").substring(0, 50),
-      bgColor: s.colors.background,
-      textColor: s.colors.text,
-      classes: s.classes,
-      rect: s.rect,
-    }));
+  const result = {
+    cssData,
+    snapshots,
+    images: imageData.images,
+    logoCandidates: imageData.logoCandidates,
+    brandName,
+    typography,
+    frameworkHints,
+    colorScheme,
+    pageBackground,
+    backgroundCandidates,
+  };
+
+  // Only add debug info if DEBUG flag is true (not in production)
+  if (DEBUG) {
+    const colorSchemeDebug = (() => {
+      const body = document.body;
+      const html = document.documentElement;
+      const bodyBg = getComputedStyle(body).backgroundColor;
+      const htmlBg = getComputedStyle(html).backgroundColor;
+      
+      let prefersDark = false;
+      try {
+        prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      } catch (e) {}
+      
+      const hasDarkClass = html.classList.contains("dark") || body.classList.contains("dark");
+      const hasLightClass = html.classList.contains("light") || body.classList.contains("light");
+      const dataTheme = html.getAttribute("data-theme") || body.getAttribute("data-theme");
+      
+      return {
+        detected: colorScheme,
+        bodyBg,
+        htmlBg,
+        prefersColorScheme: prefersDark ? "dark" : "light",
+        hasDarkClass,
+        hasLightClass,
+        dataTheme,
+      };
+    })();
+
+    const buttonDebug = snapshots
+      .filter(s => s.isButton)
+      .slice(0, 10)
+      .map((s, idx) => ({
+        index: idx,
+        text: (s.text || "").substring(0, 50),
+        bgColor: s.colors.background,
+        textColor: s.colors.text,
+        borderColor: s.colors.border,
+        borderWidth: s.colors.borderWidth,
+        classes: s.classes,
+        rect: s.rect,
+      }));
+
+    result.debug = {
+      buttonColors: buttonDebug,
+      colorScheme: colorSchemeDebug,
+    };
+  }
 
   return {
-    branding: {
-      cssData,
-      snapshots,
-      images: imageData.images,
-      logoCandidates: imageData.logoCandidates,
-      brandName,
-      typography,
-      frameworkHints,
-      colorScheme,
-      pageBackground,
-      backgroundCandidates,
-      debug: {
-        buttonColors: buttonDebug,
-        colorScheme: colorSchemeDebug,
-      },
-    },
+    branding: result,
   };
 })();`;

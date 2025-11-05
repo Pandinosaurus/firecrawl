@@ -318,9 +318,33 @@ export const getBrandingScript = () => String.raw`
       "twitter",
     );
 
-    const headerLinkImg = document.querySelector(
-      'header a img, header a svg, nav a img, nav a svg, [role="banner"] a img, [role="banner"] a svg, .header a img, .header a svg',
-    );
+    // Try to find logo in header/nav/navbar first, or in elements with logo-related classes
+    const headerLinkImgCandidates = Array.from(document.querySelectorAll(
+      'header a img, header a svg, nav a img, nav a svg, [role="banner"] a img, [role="banner"] a svg, .header a img, .header a svg, #navbar a img, #navbar a svg, [id*="navbar"] a img, [id*="navbar"] a svg, [class*="navbar"] a img, [class*="navbar"] a svg, a[class*="logo"] img, a[class*="logo"] svg, img[class*="nav-logo"], svg[class*="nav-logo"], img[class*="logo"], svg[class*="logo"]',
+    )).filter(el => {
+      // Filter out hidden elements (common in dark/light mode setups)
+      const rect = el.getBoundingClientRect();
+      const style = getComputedStyle(el);
+      return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        style.display !== "none" &&
+        style.visibility !== "hidden" &&
+        style.opacity !== "0"
+      );
+    });
+
+    // Prefer images in header/nav/navbar, then by position
+    const headerLinkImg = headerLinkImgCandidates.reduce((best, el) => {
+      if (!best) return el;
+      const elInHeader = el.closest('header, nav, [role="banner"], #navbar, [id*="navbar"], [class*="navbar"]');
+      const bestInHeader = best.closest('header, nav, [role="banner"], #navbar, [id*="navbar"], [class*="navbar"]');
+      if (elInHeader && !bestInHeader) return el;
+      if (!elInHeader && bestInHeader) return best;
+      const elRect = el.getBoundingClientRect();
+      const bestRect = best.getBoundingClientRect();
+      return elRect.top < bestRect.top ? el : best;
+    }, null);
 
     if (headerLinkImg) {
       if (headerLinkImg.tagName.toLowerCase() === "svg") {
@@ -346,16 +370,34 @@ export const getBrandingScript = () => String.raw`
             !img.closest(
               '[class*="testimonial"], [class*="client"], [class*="partner"]',
             ),
-        );
+        )
+        // Filter out hidden images (common in dark/light mode setups)
+        .filter(img => {
+          const rect = img.getBoundingClientRect();
+          const style = getComputedStyle(img);
+          return (
+            rect.width > 0 &&
+            rect.height > 0 &&
+            style.display !== "none" &&
+            style.visibility !== "hidden" &&
+            style.opacity !== "0"
+          );
+        });
 
       const logoImg = logoImgCandidates.reduce((best, img) => {
         if (!best) return img;
-        const imgInHeader = img.closest('header, nav, [role="banner"]');
-        const bestInHeader = best.closest('header, nav, [role="banner"]');
+        const imgInHeader = img.closest('header, nav, [role="banner"], #navbar, [id*="navbar"], [class*="navbar"]');
+        const bestInHeader = best.closest('header, nav, [role="banner"], #navbar, [id*="navbar"], [class*="navbar"]');
         if (imgInHeader && !bestInHeader) return img;
         if (!imgInHeader && bestInHeader) return best;
         const imgRect = img.getBoundingClientRect();
         const bestRect = best.getBoundingClientRect();
+        // Prefer images with larger dimensions if at similar vertical positions
+        if (Math.abs(imgRect.top - bestRect.top) < 10) {
+          const imgArea = imgRect.width * imgRect.height;
+          const bestArea = bestRect.width * bestRect.height;
+          return imgArea > bestArea ? img : best;
+        }
         return imgRect.top < bestRect.top ? img : best;
       }, null);
 
@@ -370,16 +412,34 @@ export const getBrandingScript = () => String.raw`
             !svg.closest(
               '[class*="testimonial"], [class*="client"], [class*="partner"]',
             ),
-        );
+        )
+        // Filter out hidden SVGs
+        .filter(svg => {
+          const rect = svg.getBoundingClientRect();
+          const style = getComputedStyle(svg);
+          return (
+            rect.width > 0 &&
+            rect.height > 0 &&
+            style.display !== "none" &&
+            style.visibility !== "hidden" &&
+            style.opacity !== "0"
+          );
+        });
 
       const svgLogo = svgLogoCandidates.reduce((best, svg) => {
         if (!best) return svg;
-        const svgInHeader = svg.closest('header, nav, [role="banner"]');
-        const bestInHeader = best.closest('header, nav, [role="banner"]');
+        const svgInHeader = svg.closest('header, nav, [role="banner"], #navbar, [id*="navbar"], [class*="navbar"]');
+        const bestInHeader = best.closest('header, nav, [role="banner"], #navbar, [id*="navbar"], [class*="navbar"]');
         if (svgInHeader && !bestInHeader) return svg;
         if (!svgInHeader && bestInHeader) return best;
         const svgRect = svg.getBoundingClientRect();
         const bestRect = best.getBoundingClientRect();
+        // Prefer SVGs with larger dimensions if at similar vertical positions
+        if (Math.abs(svgRect.top - bestRect.top) < 10) {
+          const svgArea = svgRect.width * svgRect.height;
+          const bestArea = bestRect.width * bestRect.height;
+          return svgArea > bestArea ? svg : best;
+        }
         return svgRect.top < bestRect.top ? svg : best;
       }, null);
 

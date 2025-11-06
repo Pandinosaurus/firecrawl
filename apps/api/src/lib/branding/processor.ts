@@ -2,7 +2,7 @@ import { BrandingProfile } from "../../types/branding";
 import { BrandingScriptReturn } from "./types";
 import { parse, rgb, formatHex } from "culori";
 
-function hexify(rgba: string): string | null {
+function hexify(rgba: string, background?: string | null): string | null {
   if (!rgba) return null;
 
   try {
@@ -25,26 +25,47 @@ function hexify(rgba: string): string | null {
       return null;
     }
 
+    // If color has alpha < 1, blend it with background before converting to hex
+    // This prevents translucent overlays from being treated as opaque
+    if (alpha < 1) {
+      let bgR = 255; // Default to white
+      let bgG = 255;
+      let bgB = 255;
+
+      // Try to parse background color if provided
+      if (background) {
+        try {
+          const bgColor = parse(background);
+          if (bgColor) {
+            const bgRgb = rgb(bgColor);
+            if (bgRgb && bgRgb.mode === "rgb") {
+              bgR = Math.round((bgRgb.r ?? 1) * 255);
+              bgG = Math.round((bgRgb.g ?? 1) * 255);
+              bgB = Math.round((bgRgb.b ?? 1) * 255);
+            }
+          }
+        } catch (e) {
+          // If background parsing fails, use white default
+        }
+      }
+
+      // Alpha compositing: blend foreground with background
+      // result = alpha * foreground + (1 - alpha) * background
+      r = Math.round(alpha * r + (1 - alpha) * bgR);
+      g = Math.round(alpha * g + (1 - alpha) * bgG);
+      b = Math.round(alpha * b + (1 - alpha) * bgB);
+    }
+
     // Clamp values to valid range
     r = Math.max(0, Math.min(255, r));
     g = Math.max(0, Math.min(255, g));
     b = Math.max(0, Math.min(255, b));
 
-    // Format as hex
+    // Format as hex (always return #RRGGBB after blending)
     const rHex = r.toString(16).padStart(2, "0");
     const gHex = g.toString(16).padStart(2, "0");
     const bHex = b.toString(16).padStart(2, "0");
-
-    if (alpha < 1) {
-      // Include alpha channel in hex format (#RRGGBBAA)
-      const aHex = Math.round(alpha * 255)
-        .toString(16)
-        .padStart(2, "0");
-      return `#${rHex}${gHex}${bHex}${aHex}`.toUpperCase();
-    } else {
-      // No alpha channel (#RRGGBB)
-      return `#${rHex}${gHex}${bHex}`.toUpperCase();
-    }
+    return `#${rHex}${gHex}${bHex}`.toUpperCase();
   } catch (e) {
     return null;
   }
@@ -84,12 +105,16 @@ function inferPalette(
 
   for (const s of snapshots) {
     const area = Math.max(1, s.rect.w * s.rect.h);
-    bump(hexify(s.colors.background), 0.5 + Math.log10(area + 10));
-    bump(hexify(s.colors.text), 1.0);
-    bump(hexify(s.colors.border), 0.3);
+    // Blend semi-transparent colors with page background if available
+    bump(
+      hexify(s.colors.background, pageBackground),
+      0.5 + Math.log10(area + 10),
+    );
+    bump(hexify(s.colors.text, pageBackground), 1.0);
+    bump(hexify(s.colors.border, pageBackground), 0.3);
   }
 
-  for (const c of cssColors) bump(hexify(c), 0.5);
+  for (const c of cssColors) bump(hexify(c, pageBackground), 0.5);
 
   const ranked = Array.from(freq.entries())
     .sort((a, b) => b[1] - a[1])
@@ -281,11 +306,13 @@ export function processRawBranding(raw: BrandingScriptReturn): BrandingProfile {
       if (!s.text || s.text.trim().length === 0) return false;
 
       // Include buttons with valid background OR buttons with borders (transparent bg + border is valid)
-      const bgHex = hexify(s.colors.background);
+      const bgHex = hexify(s.colors.background, raw.pageBackground);
 
       // Check for borders: has borderWidth > 0 AND border color is not transparent
       const hasBorder = s.colors.borderWidth && s.colors.borderWidth > 0;
-      const borderHex = hasBorder ? hexify(s.colors.border) : null;
+      const borderHex = hasBorder
+        ? hexify(s.colors.border, raw.pageBackground)
+        : null;
 
       // Include if has background OR has border (transparent buttons with borders are valid)
       // Note: borderHex might be null if border is transparent, but we still check hasBorder
@@ -318,10 +345,10 @@ export function processRawBranding(raw: BrandingScriptReturn): BrandingProfile {
       ];
       if (ctaKeywords.some(kw => text.includes(kw))) score += 500;
 
-      const bgHex = hexify(s.colors.background);
+      const bgHex = hexify(s.colors.background, raw.pageBackground);
       const borderHex =
         s.colors.borderWidth && s.colors.borderWidth > 0
-          ? hexify(s.colors.border)
+          ? hexify(s.colors.border, raw.pageBackground)
           : null;
 
       // Score for non-white backgrounds
@@ -353,10 +380,12 @@ export function processRawBranding(raw: BrandingScriptReturn): BrandingProfile {
   const uniqueButtons: typeof candidateButtons = [];
 
   for (const button of candidateButtons) {
-    const bgHex = hexify(button.colors.background) || "transparent";
+    const bgHex =
+      hexify(button.colors.background, raw.pageBackground) || "transparent";
     const borderHex =
       button.colors.borderWidth && button.colors.borderWidth > 0
-        ? hexify(button.colors.border) || "transparent-border"
+        ? hexify(button.colors.border, raw.pageBackground) ||
+          "transparent-border"
         : "no-border";
     const textKey = (button.text || "").trim().toLowerCase().substring(0, 50);
     const classKey = (button.classes || "")
@@ -382,10 +411,10 @@ export function processRawBranding(raw: BrandingScriptReturn): BrandingProfile {
   const topButtons = uniqueButtons.slice(0, 80);
 
   const buttonSnapshots = topButtons.map((s, idx) => {
-    let bgHex = hexify(s.colors.background);
+    let bgHex = hexify(s.colors.background, raw.pageBackground);
     const borderHex =
       s.colors.borderWidth && s.colors.borderWidth > 0
-        ? hexify(s.colors.border)
+        ? hexify(s.colors.border, raw.pageBackground)
         : null;
 
     if (!bgHex) {
@@ -398,7 +427,7 @@ export function processRawBranding(raw: BrandingScriptReturn): BrandingProfile {
       html: "",
       classes: s.classes || "",
       background: bgHex,
-      textColor: hexify(s.colors.text) || "#000000",
+      textColor: hexify(s.colors.text, raw.pageBackground) || "#000000",
       borderColor: borderHex,
       borderRadius: s.radius ? `${s.radius}px` : "0px",
       shadow: s.shadow || null,

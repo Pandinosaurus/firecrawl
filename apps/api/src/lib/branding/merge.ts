@@ -34,7 +34,11 @@ export function mergeBrandingResults(
     llm.logoSelection.selectedLogoIndex < logoCandidates.length
   ) {
     const selectedLogo = logoCandidates[llm.logoSelection.selectedLogoIndex];
-    if (selectedLogo && merged.images) {
+    if (selectedLogo) {
+      // Initialize images object if it doesn't exist
+      if (!merged.images) {
+        merged.images = {};
+      }
       merged.images.logo = selectedLogo.src;
       (merged as any).__llm_logo_reasoning = {
         selectedIndex: llm.logoSelection.selectedLogoIndex,

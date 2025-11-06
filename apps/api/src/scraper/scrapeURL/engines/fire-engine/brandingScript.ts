@@ -832,13 +832,21 @@ export const getBrandingScript = () => String.raw`
     if (!color || typeof color !== "string") return false;
     const normalized = color.toLowerCase().trim();
     // Explicitly transparent
-    if (normalized === "transparent" || normalized === "rgba(0, 0, 0, 0)" || normalized === "rgb(0, 0, 0)") {
+    if (normalized === "transparent" || normalized === "rgba(0, 0, 0, 0)") {
       return false;
     }
-    // Check for rgba/rgb with alpha 0 or all zeros
-    if (normalized.startsWith("rgba(0, 0, 0, 0") || normalized.startsWith("rgb(0, 0, 0)")) {
-      return false;
+    // Check for rgba with alpha exactly 0 (not just starting with 0)
+    const rgbaMatch = normalized.match(/rgba\(\s*0\s*,\s*0\s*,\s*0\s*,\s*([\d.]+)\s*\)/);
+    if (rgbaMatch) {
+      const alpha = parseFloat(rgbaMatch[1]);
+      // Only filter if alpha is exactly 0 (or very close to 0 due to floating point)
+      if (alpha < 0.01) {
+        return false;
+      }
+      // rgba(0, 0, 0, 0.8) and similar opaque black backgrounds are valid
+      return true;
     }
+    // rgb(0, 0, 0) is a valid black background, not transparent
     // Check for color() format with alpha 0
     const colorMatch = normalized.match(/color\([^)]+\)/);
     if (colorMatch) {

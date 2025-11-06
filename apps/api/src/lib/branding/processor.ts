@@ -39,9 +39,15 @@ function hexify(rgba: string, background?: string | null): string | null {
           if (bgColor) {
             const bgRgb = rgb(bgColor);
             if (bgRgb && bgRgb.mode === "rgb") {
-              bgR = Math.round((bgRgb.r ?? 1) * 255);
-              bgG = Math.round((bgRgb.g ?? 1) * 255);
-              bgB = Math.round((bgRgb.b ?? 1) * 255);
+              const bgAlpha = bgRgb.alpha ?? 1;
+              // Only use background color if it's not transparent
+              // Transparent backgrounds should fall back to default white
+              if (bgAlpha >= 0.01) {
+                bgR = Math.round((bgRgb.r ?? 1) * 255);
+                bgG = Math.round((bgRgb.g ?? 1) * 255);
+                bgB = Math.round((bgRgb.b ?? 1) * 255);
+              }
+              // If bgAlpha < 0.01, keep default white values
             }
           }
         } catch (e) {

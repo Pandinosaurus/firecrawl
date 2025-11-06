@@ -2,7 +2,11 @@ import { BrandingProfile } from "../../types/branding";
 import { BrandingScriptReturn } from "./types";
 import { parse, rgb, formatHex } from "culori";
 
-function hexify(rgba: string, background?: string | null): string | null {
+// Export for testing
+export function hexify(
+  rgba: string,
+  background?: string | null,
+): string | null {
   if (!rgba) return null;
 
   try {

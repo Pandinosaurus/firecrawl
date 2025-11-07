@@ -318,7 +318,7 @@ export async function generateCompletions({
   let currentModel = model;
   let lastError: Error | null = null;
 
-  const modelId =
+  let modelId =
     typeof currentModel === "string" ? currentModel : currentModel.modelId;
 
   if (markdown === undefined) {
@@ -350,6 +350,9 @@ export async function generateCompletions({
                 deepResearchId: metadata.deepResearchId ?? "unspecified",
                 llmsTxtId: metadata.llmsTxtId ?? "unspecified",
               },
+            },
+            openai: {
+              strictJsonSchema: true,
             },
           },
           experimental_telemetry: {
@@ -431,6 +434,10 @@ export async function generateCompletions({
             error: lastError.message,
           });
           currentModel = retryModel;
+          modelId =
+            typeof currentModel === "string"
+              ? currentModel
+              : currentModel.modelId;
           try {
             const result = await generateText({
               model: currentModel,
@@ -807,6 +814,10 @@ export async function generateCompletions({
           error: lastError.message,
         });
         currentModel = retryModel;
+        modelId =
+          typeof currentModel === "string"
+            ? currentModel
+            : currentModel.modelId;
         try {
           const retryConfig = {
             ...generateObjectConfig,

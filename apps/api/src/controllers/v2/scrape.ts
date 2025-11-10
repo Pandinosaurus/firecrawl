@@ -122,6 +122,7 @@ export async function scrapeController(
         const lockStart = Date.now();
         const aborter = new AbortController();
         if (timeout) {
+          // Semaphore has 2/3 of the timeout time to get a lock to allow for scrape time
           timeoutHandle = setTimeout(() => {
             aborter.abort();
           }, timeout * 0.667);

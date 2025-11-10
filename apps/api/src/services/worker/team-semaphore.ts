@@ -1,4 +1,5 @@
 import { isSelfHosted } from "../../lib/deployment";
+import { TransportableError } from "../../lib/error";
 import { logger as _logger } from "../../lib/logger";
 import { nuqRedis, semaphoreKeys } from "./redis";
 
@@ -48,11 +49,11 @@ async function acquireBlocking(
   let failedOnce = false;
   do {
     if (options.signal.aborted) {
-      throw new Error("semaphore_aborted");
+      throw new TransportableError("SCRAPE_TIMEOUT", "semaphore_aborted");
     }
 
     if (deadline < Date.now()) {
-      throw new Error("semaphore_timeout");
+      throw new TransportableError("SCRAPE_TIMEOUT", "semaphore_timeout");
     }
 
     const [granted, _count, _removed] = await runScript<

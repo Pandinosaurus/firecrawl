@@ -47,8 +47,7 @@ describe("hexify color conversion", () => {
     });
 
     it("handles transparent keyword", () => {
-      // Note: transparent might be parsed differently, but should return null
-      // This depends on how culori parses "transparent"
+      expect(hexify("transparent")).toBeNull();
     });
   });
 
